@@ -1,0 +1,18 @@
+{
+  // Cloudflare Workers の設定 (OpenNext アダプタ経由で Next.js を動かす)
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ematchboard",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+  // PANDASCORE_TOKEN は絶対にここに書かない。デプロイ後に
+  //   npx wrangler secret put PANDASCORE_TOKEN
+  // で登録する(ローカルプレビュー用は .dev.vars に書く)
+}

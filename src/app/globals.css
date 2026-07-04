@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* esports系サイトの定番に合わせてダークテーマ固定 */
+:root {
+  --background: #0c0f16;
+  --surface: #151a24;
+  --surface-hover: #1b2130;
+  --border: #232a3a;
+  --foreground: #e8ebf2;
+  --muted: #8b94a7;
+  --brand: #22d3ee;
+  --live: #f43f5e;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border-subtle: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-live: var(--live);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
