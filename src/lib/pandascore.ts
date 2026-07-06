@@ -29,10 +29,18 @@ export function hasApiToken(): boolean {
   return Boolean(process.env.PANDASCORE_TOKEN);
 }
 
-// プロセス内5分キャッシュ。Cloudflare WorkersではNextのfetchキャッシュが
-// 効かない構成があるため、環境を問わない保険としてメモリでも持つ(二重でも無害)
+// 3層キャッシュ戦略(無料枠1,000req/時を守る生命線):
+//  1. プロセス内メモリ(5分) — 同一インスタンス内の連続アクセス用
+//  2. Cloudflareエッジキャッシュ(5分) — Workers全インスタンス共有。
+//     WorkersではNextのfetchキャッシュ(revalidate)が永続化されないため必須
+//  3. 上流が429等で失敗したら、期限切れのメモリキャッシュでも返す(空表示より古いデータ)
 const memCache = new Map<string, { expires: number; data: unknown }>();
 const MEM_TTL_MS = 5 * 60_000;
+
+function edgeCache(): Cache | undefined {
+  return (globalThis as { caches?: CacheStorage & { default?: Cache } }).caches
+    ?.default;
+}
 
 async function psFetch<T>(
   path: string,
@@ -44,15 +52,37 @@ async function psFetch<T>(
   const hit = memCache.get(url);
   if (hit && hit.expires > Date.now()) return hit.data as T;
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${process.env.PANDASCORE_TOKEN}`,
-      Accept: "application/json",
-    },
-    // 5分キャッシュ: 何人アクセスしても PandaScore へのリクエストは5分に1回で済む
-    next: { revalidate: 300 },
-  });
+  // エッジキャッシュ(URLのみがキーで、トークンは含まれないので安全)
+  const cache = edgeCache();
+  if (cache) {
+    try {
+      const cached = await cache.match(url);
+      if (cached) {
+        const data = (await cached.json()) as T;
+        memCache.set(url, { expires: Date.now() + MEM_TTL_MS, data });
+        return data;
+      }
+    } catch {
+      // エッジキャッシュの失敗は無視して上流へ
+    }
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${process.env.PANDASCORE_TOKEN}`,
+        Accept: "application/json",
+      },
+      // Node/Vercel環境ではこれが5分キャッシュとして効く
+      next: { revalidate: 300 },
+    });
+  } catch (err) {
+    if (hit) return hit.data as T; // 通信失敗: 期限切れキャッシュで凌ぐ
+    throw err;
+  }
   if (!res.ok) {
+    if (hit) return hit.data as T; // レート制限(429)等: 同上
     throw new Error(`PandaScore error ${res.status} for ${path}`);
   }
   const data = (await res.json()) as T;
@@ -61,6 +91,21 @@ async function psFetch<T>(
   if (memCache.size > 500) {
     for (const [k, v] of memCache) {
       if (v.expires < Date.now()) memCache.delete(k);
+    }
+  }
+  if (cache) {
+    try {
+      await cache.put(
+        url,
+        new Response(JSON.stringify(data), {
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "public, max-age=300, s-maxage=300",
+          },
+        })
+      );
+    } catch {
+      // キャッシュ保存失敗は無視(次回また上流から取る)
     }
   }
   return data;
