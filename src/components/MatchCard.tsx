@@ -124,6 +124,13 @@ export default function MatchRow({
             {roundLabel}
           </span>
         )}
+        <Link
+          href={`/${gameSlug}/match/${match.id}`}
+          aria-label="View lineups and match details"
+          className="pointer-events-auto shrink-0 rounded-lg border border-border-subtle px-2.5 py-1.5 text-xs font-semibold text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+        >
+          Lineups ›
+        </Link>
         {running && stream && (
           <a
             href={stream}
