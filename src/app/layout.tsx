@@ -28,6 +28,9 @@ export const metadata: Metadata = {
     siteName: "eMATCH BOARD",
     type: "website",
   },
+  verification: {
+    google: "5XCLyjKuD-EoH4Q1N4um_HDpPa5obmnduKGMAzHOiko",
+  },
 };
 
 export default function RootLayout({
