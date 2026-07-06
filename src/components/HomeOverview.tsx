@@ -5,9 +5,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import { DAY_MS, localDayStart, parseDateStr, toDateStr } from "@/lib/date";
 import { useFollowedGames } from "@/lib/follow";
 import type { GameConfig } from "@/lib/games";
+import { eventsOverlapping } from "@/lib/manual-events";
 import type { ViewMode } from "@/lib/range";
 import type { Match } from "@/lib/types";
 import DateNav from "./DateNav";
+import EventList from "./EventList";
 import MonthSummaryList from "./MonthSummaryList";
 import PeriodNav from "./PeriodNav";
 import TournamentGroups from "./TournamentGroups";
@@ -132,6 +134,11 @@ export default function HomeOverview({
       />
     );
     renderBody = (game, matches) => {
+      if (game.eventsOnly) {
+        return (
+          <EventList events={eventsOverlapping(game.slug, weekStart, weekEnd)} />
+        );
+      }
       const inWeek = matches.filter((m) => {
         if (!m.begin_at) return false;
         const t = localDayStart(new Date(m.begin_at));
@@ -172,20 +179,34 @@ export default function HomeOverview({
         badge={offset === 0 ? "This month" : null}
       />
     );
-    renderBody = (game, matches) => (
-      <MonthSummaryList
-        matches={matches}
-        gameSlug={game.slug}
-        rangeStart={monthStart}
-        rangeEnd={monthEnd}
-        emptyText="No tournaments this month"
-      />
-    );
+    renderBody = (game, matches) => {
+      if (game.eventsOnly) {
+        return (
+          <EventList events={eventsOverlapping(game.slug, monthStart, monthEnd)} />
+        );
+      }
+      return (
+        <MonthSummaryList
+          matches={matches}
+          gameSlug={game.slug}
+          rangeStart={monthStart}
+          rangeEnd={monthEnd}
+          emptyText="No tournaments this month"
+        />
+      );
+    };
   } else {
     const effectiveDate = selectedDate ?? toDateStr(todayStart);
     const selStart = parseDateStr(effectiveDate) ?? todayStart;
     nav = <DateNav basePath="/" selectedDate={effectiveDate} />;
     renderBody = (game, matches) => {
+      if (game.eventsOnly) {
+        return (
+          <EventList
+            events={eventsOverlapping(game.slug, selStart, selStart + DAY_MS)}
+          />
+        );
+      }
       const onDay = matches.filter(
         (m) => m.begin_at && localDayStart(new Date(m.begin_at)) === selStart
       );

@@ -24,8 +24,9 @@ export default async function Home({ searchParams }: Props) {
   const dateStr = parseDateParam(sp.d);
 
   const { from, to } = rangeFor(view, offset, dateStr);
+  // eventsOnlyタイトルはPandaScore非対応なのでフェッチしない(ホーム側で大会一覧を出す)
   const perGame = await Promise.all(
-    GAMES.map(async (g) => ({
+    GAMES.filter((g) => !g.eventsOnly).map(async (g) => ({
       slug: g.slug,
       matches: await getMatches(g.slug, from, to).catch(() => []),
     }))

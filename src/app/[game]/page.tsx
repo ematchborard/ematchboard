@@ -8,6 +8,8 @@ import {
   parseViewMode,
   rangeFor,
 } from "@/lib/range";
+import { eventsForGame } from "@/lib/manual-events";
+import EventList from "@/components/EventList";
 import MatchList from "@/components/MatchList";
 import MonthOverview from "@/components/MonthOverview";
 import ViewTabs from "@/components/ViewTabs";
@@ -36,6 +38,20 @@ export default async function GamePage({ params, searchParams }: Props) {
   const [{ game }, sp] = await Promise.all([params, searchParams]);
   const config = getGame(game);
   if (!config) notFound();
+
+  // バトロワ系など試合データが無いタイトルは、大会スケジュールのみ表示
+  if (config.eventsOnly) {
+    return (
+      <div>
+        <h1 className="mb-1 text-lg font-bold">{config.name} — Major Events</h1>
+        <p className="mb-4 text-xs text-muted">
+          Match-level data isn&apos;t available for this title yet. Major
+          tournament schedule below.
+        </p>
+        <EventList events={eventsForGame(config.slug)} />
+      </div>
+    );
+  }
 
   const view = parseViewMode(sp.view);
   const offset = parseOffset(sp.o);

@@ -7,6 +7,9 @@ export interface GameConfig {
   name: string;
   short: string; // サイドバーのアイコン用略称
   accent: string; // タブ/サイドバーのアクティブ色
+  // true = PandaScore非対応のバトロワ系など。試合単位のデータは無く、
+  // 大会スケジュール(lib/manual-events.ts で手動管理)だけを表示する
+  eventsOnly?: boolean;
 }
 
 export const GAMES: GameConfig[] = [
@@ -22,6 +25,10 @@ export const GAMES: GameConfig[] = [
   { slug: "codmw", name: "Call of Duty", short: "COD", accent: "#7ac142" },
   { slug: "fifa", name: "EA Sports FC", short: "FC", accent: "#2ecc71" },
   { slug: "starcraft-2", name: "StarCraft 2", short: "SC2", accent: "#8fb8ff" },
+  // Events only (大会スケジュールのみ)
+  { slug: "apex", name: "Apex Legends", short: "APEX", accent: "#da292a", eventsOnly: true },
+  { slug: "fortnite", name: "Fortnite", short: "FN", accent: "#9d59f5", eventsOnly: true },
+  { slug: "tft", name: "Teamfight Tactics", short: "TFT", accent: "#f7a833", eventsOnly: true },
 ];
 
 export const DEFAULT_GAME = GAMES[0];
