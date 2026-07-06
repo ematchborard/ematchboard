@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(process.env.SITE_URL ?? "https://ematchboard.com"),
   title: "eMATCH BOARD — Esports Schedules & Results",
   description:
     "Match schedules, live status and results for VALORANT, League of Legends, CS2 and more esports — tournaments, brackets and rosters in your local timezone.",
