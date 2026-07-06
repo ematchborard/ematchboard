@@ -160,7 +160,7 @@ export default function GameSidebar() {
                     <img
                       src={team.image_url}
                       alt=""
-                      className="h-6 w-6 shrink-0 object-contain"
+                      className="logo-chip h-6 w-6 shrink-0 object-contain"
                     />
                   ) : (
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-hover text-[9px] font-bold text-muted">

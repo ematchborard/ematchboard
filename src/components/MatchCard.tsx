@@ -24,7 +24,7 @@ function TeamRow({
     <>
       {team?.image_url ? (
         // eslint-disable-next-line @next/next/no-img-element -- 外部CDNのチームロゴ。ドメインが多数あるのでnext/imageは使わない
-        <img src={team.image_url} alt="" className="h-5 w-5 object-contain" />
+        <img src={team.image_url} alt="" className="logo-chip h-5 w-5 object-contain" />
       ) : (
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-hover text-[9px] font-bold text-muted">
           {team ? (team.acronym ?? team.name).slice(0, 2).toUpperCase() : "?"}

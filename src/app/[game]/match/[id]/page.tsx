@@ -33,7 +33,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 function TeamLogo({ team, size }: { team: Team | null; size: string }) {
   if (team?.image_url) {
     // eslint-disable-next-line @next/next/no-img-element -- 外部CDNのチームロゴ
-    return <img src={team.image_url} alt="" className={`${size} object-contain`} />;
+    return (
+      <img src={team.image_url} alt="" className={`logo-chip ${size} object-contain`} />
+    );
   }
   return (
     <span
