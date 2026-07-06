@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* esports系サイトの定番に合わせてダークテーマ固定 */
+/* デフォルトはダーク(esports系の定番)。ライトは data-theme="light" で切替 */
 :root {
   --background: #0c0f16;
   --surface: #151a24;
@@ -10,6 +10,19 @@
   --muted: #8b94a7;
   --brand: #22d3ee;
   --live: #f43f5e;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --background: #f3f5f9;
+  --surface: #ffffff;
+  --surface-hover: #e9edf4;
+  --border: #dbe1eb;
+  --foreground: #182234;
+  --muted: #5d6a80;
+  --brand: #0e7490; /* 白背景でも読めるよう暗めのシアン */
+  --live: #e11d48;
+  color-scheme: light;
 }
 
 @theme inline {

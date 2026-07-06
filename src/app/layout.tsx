@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import GameSidebar from "@/components/GameSidebar";
 import GameTabs from "@/components/GameTabs";
 import LanguageSelect from "@/components/LanguageSelect";
+import ThemeToggle from "@/components/ThemeToggle";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -41,16 +42,26 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
+        {/* ライトモード選択済みのユーザーで、描画前にテーマを適用(チラつき防止) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem("esports-mob:theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}`,
+          }}
+        />
         <header className="sticky top-0 z-10 border-b border-border-subtle bg-background/90 backdrop-blur">
           <div className="mx-auto w-full max-w-5xl px-4 pt-4 pb-3 md:pb-4">
             <div className="flex items-center justify-between">
               <Link href="/" className="text-lg font-bold tracking-tight">
                 <span className="text-brand">e</span>MATCH BOARD
               </Link>
-              <LanguageSelect />
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <LanguageSelect />
+              </div>
             </div>
             {/* スマホ幅ではサイドバーの代わりにタブでゲーム切替 */}
             <div className="md:hidden">
