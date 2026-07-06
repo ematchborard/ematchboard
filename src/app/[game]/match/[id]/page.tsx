@@ -9,6 +9,7 @@ import {
 } from "@/lib/pandascore";
 import type { Match, Team } from "@/lib/types";
 import LocalTime from "@/components/LocalTime";
+import MatchLineups from "@/components/MatchLineups";
 import MatchRow from "@/components/MatchCard";
 
 // 試合詳細ページ。
@@ -266,39 +267,9 @@ export default async function MatchPage({ params }: Props) {
         </section>
       )}
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {[teamA, teamB].map((team, i) => (
-          <div
-            key={i}
-            className="overflow-hidden rounded-xl border border-border-subtle bg-surface"
-          >
-            <h3 className="border-b border-border-subtle bg-surface-hover/50 px-4 py-2.5 text-sm font-semibold">
-              {team?.name ?? (i === 0 ? (teamARef?.name ?? "TBD") : (teamBRef?.name ?? "TBD"))}{" "}
-              roster
-            </h3>
-            {!team || team.players.length === 0 ? (
-              <p className="px-4 py-4 text-center text-xs text-muted">
-                No roster data
-              </p>
-            ) : (
-              <div className="divide-y divide-border-subtle">
-                {team.players.map((p) => (
-                  <div key={p.id} className="flex items-center gap-2 px-4 py-2">
-                    <span className="truncate text-sm font-medium">{p.name}</span>
-                    {p.role && (
-                      <span className="shrink-0 text-[10px] font-semibold uppercase text-brand">
-                        {p.role}
-                      </span>
-                    )}
-                    <span className="ml-auto shrink-0 truncate text-xs text-muted">
-                      {[p.first_name, p.last_name].filter(Boolean).join(" ")}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+      <section>
+        <h2 className="mb-2 text-sm font-semibold">Lineups</h2>
+        <MatchLineups teamA={teamA} teamB={teamB} />
       </section>
     </div>
   );
