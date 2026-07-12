@@ -8,6 +8,7 @@ import {
   getTeamRecentMatches,
 } from "@/lib/pandascore";
 import type { Match, Team } from "@/lib/types";
+import { jsonLdString } from "@/lib/seo";
 import LocalTime from "@/components/LocalTime";
 import MatchLineups from "@/components/MatchLineups";
 import MatchRow from "@/components/MatchCard";
@@ -106,8 +107,27 @@ export default async function MatchPage({ params }: Props) {
     match.games.length > 0 && (finished || running) && match.results.length > 0;
   const streams = match.streams_list.filter((s) => s.raw_url);
 
+  // 検索エンジン向けの構造化データ(試合=スポーツイベント+対戦チーム)
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SportsEvent",
+    name: `${teamARef?.name ?? "TBD"} vs ${teamBRef?.name ?? "TBD"} — ${eventName}`,
+    sport: config.name,
+    startDate: match.begin_at ?? undefined,
+    eventStatus: "https://schema.org/EventScheduled",
+    competitor: [teamARef, teamBRef]
+      .filter((t): t is NonNullable<typeof t> => Boolean(t))
+      .map((t) => ({ "@type": "SportsTeam", name: t.name })),
+    superEvent: { "@type": "SportsEvent", name: eventName },
+    url: `https://ematchboard.com/${config.slug}/match/${match.id}`,
+  };
+
   return (
     <div className="flex flex-col gap-4">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }}
+      />
       <Link
         href={`/${config.slug}/event/${match.serie.id}`}
         className="text-xs text-muted hover:text-foreground"

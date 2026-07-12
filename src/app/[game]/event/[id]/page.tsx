@@ -7,6 +7,7 @@ import {
   getSerieMatches,
   getSerieTournaments,
 } from "@/lib/pandascore";
+import { jsonLdString } from "@/lib/seo";
 import StageTabs from "@/components/StageTabs";
 import TournamentSchedule from "@/components/TournamentSchedule";
 
@@ -59,8 +60,25 @@ export default async function EventPage({ params }: Props) {
         a.name.localeCompare(b.name)
     );
 
+  // 検索エンジン向けの構造化データ(大会=スポーツイベント)
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SportsEvent",
+    name: title,
+    sport: config.name,
+    startDate: serie.begin_at ?? undefined,
+    endDate: serie.end_at ?? undefined,
+    eventStatus: "https://schema.org/EventScheduled",
+    organizer: { "@type": "Organization", name: serie.league.name },
+    url: `https://ematchboard.com/${config.slug}/event/${serie.id}`,
+  };
+
   return (
     <div className="flex flex-col gap-4">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }}
+      />
       <Link
         href={`/${config.slug}`}
         className="text-xs text-muted hover:text-foreground"

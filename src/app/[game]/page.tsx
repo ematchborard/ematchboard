@@ -9,6 +9,7 @@ import {
   rangeFor,
 } from "@/lib/range";
 import { eventsForGame } from "@/lib/manual-events";
+import { topEventNames } from "@/lib/seo";
 import EventList from "@/components/EventList";
 import MatchList from "@/components/MatchList";
 import MonthOverview from "@/components/MonthOverview";
@@ -31,6 +32,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: config
       ? `${config.name} Schedules & Results — eMATCH BOARD`
       : "eMATCH BOARD",
+    description: config
+      ? `${config.name} esports schedule: upcoming matches, live scores, results, tournament brackets and team rosters — all shown in your local timezone.`
+      : undefined,
   };
 }
 
@@ -60,9 +64,21 @@ export default async function GamePage({ params, searchParams }: Props) {
   const { from, to } = rangeFor(view, offset, dateStr);
   const matches = await getMatches(config.slug, from, to);
   const basePath = `/${config.slug}`;
+  const topEvents = topEventNames(matches, config.slug);
 
   return (
     <div>
+      {/* 検索エンジン向けのサーバー描画テキスト(リスト本体はクライアント描画のため) */}
+      <div className="mb-3">
+        <h1 className="text-lg font-bold">
+          {config.name} Esports Schedule & Results
+        </h1>
+        <p className="mt-0.5 text-xs text-muted">
+          Upcoming {config.name} matches, live scores, brackets and standings —
+          in your local timezone.
+          {topEvents.length > 0 && ` Now on: ${topEvents.join(" · ")}.`}
+        </p>
+      </div>
       {!hasApiToken() && (
         <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
           サンプルデータを表示中 — <code>.env.local</code> に{" "}

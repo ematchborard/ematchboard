@@ -34,6 +34,14 @@ export default async function Home({ searchParams }: Props) {
 
   return (
     <div>
+      {/* 検索エンジン向けのサーバー描画テキスト */}
+      <div className="mb-3">
+        <h1 className="text-lg font-bold">Esports Schedules & Results</h1>
+        <p className="mt-0.5 text-xs text-muted">
+          Every esports match in one place — VALORANT, League of Legends, CS2,
+          Dota 2 and {GAMES.length - 4} more games, in your local timezone.
+        </p>
+      </div>
       {!hasApiToken() && (
         <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
           サンプルデータを表示中 — <code>.env.local</code> に{" "}
