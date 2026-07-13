@@ -36,7 +36,7 @@ export const MANUAL_EVENTS: ManualEvent[] = [
     name: "ALGS Year 6: Split 1 Playoffs (Esports World Cup)",
     startDate: "2026-07-07",
     endDate: "2026-07-11",
-    location: "Esports World Cup",
+    location: "Paris, France",
     streamUrl: "https://www.twitch.tv/playapex",
     detailsUrl:
       "https://liquipedia.net/apexlegends/Apex_Legends_Global_Series/2026/Split_1/Playoffs",
