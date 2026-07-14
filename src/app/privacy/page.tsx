@@ -11,7 +11,7 @@ export default function PrivacyPage() {
   return (
     <article className="prose-sm flex flex-col gap-4 text-sm leading-relaxed">
       <h1 className="text-lg font-bold">Privacy Policy</h1>
-      <p className="text-xs text-muted">Last updated: July 5, 2026</p>
+      <p className="text-xs text-muted">Last updated: July 14, 2026</p>
 
       <section>
         <h2 className="mb-1 font-semibold">Overview</h2>
@@ -40,6 +40,17 @@ export default function PrivacyPage() {
           Our hosting provider may collect standard technical logs (such as IP
           address, browser type and requested pages) for security and
           performance purposes.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="mb-1 font-semibold">Analytics</h2>
+        <p className="text-muted">
+          We use Cloudflare Web Analytics to understand aggregate site usage
+          (page views, referrers, countries). It is a privacy-first tool: it
+          does not use cookies, does not fingerprint devices, and does not
+          track you across sites. Only aggregated, non-personal statistics are
+          available to us.
         </p>
       </section>
 

@@ -75,6 +75,14 @@ export default function RootLayout({
           </aside>
           <main className="min-w-0 max-w-2xl flex-1">{children}</main>
         </div>
+        {/* Cloudflare Web Analytics (Cookie不使用のアクセス解析) */}
+        {process.env.NODE_ENV === "production" && (
+          <script
+            type="module"
+            src="https://static.cloudflareinsights.com/beacon.min.js"
+            data-cf-beacon='{"token": "ee9ceef6506a4c269589b76da9f9c0bb"}'
+          />
+        )}
         <footer className="mx-auto w-full max-w-5xl px-4 pb-6 text-center text-xs text-muted">
           <p>Source: PandaScore · All times shown in your local timezone</p>
           <p className="mt-1.5 flex justify-center gap-3">
