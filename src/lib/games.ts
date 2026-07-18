@@ -29,6 +29,8 @@ export const GAMES: GameConfig[] = [
   { slug: "apex", name: "Apex Legends", short: "APEX", accent: "#da292a", eventsOnly: true },
   { slug: "fortnite", name: "Fortnite", short: "FN", accent: "#9d59f5", eventsOnly: true },
   { slug: "tft", name: "Teamfight Tactics", short: "TFT", accent: "#f7a833", eventsOnly: true },
+  { slug: "mario-kart", name: "Mario Kart World", short: "MK", accent: "#e60012", eventsOnly: true },
+  { slug: "identity-v", name: "Identity V", short: "IDV", accent: "#a78bfa", eventsOnly: true },
 ];
 
 export const DEFAULT_GAME = GAMES[0];

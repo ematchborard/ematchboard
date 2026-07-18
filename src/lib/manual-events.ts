@@ -143,6 +143,96 @@ export const MANUAL_EVENTS: ManualEvent[] = [
     detailsUrl:
       "https://teamfighttactics.leagueoflegends.com/en-us/news/esports/set-16-tft-pro-circuit-everything-you-need-to-know/",
   },
+
+  // ---- Mario Kart World (Nintendo公式オンライン大会+コミュニティ世界大会) ----
+  {
+    id: "mkw-drivers-championship",
+    game: "mario-kart",
+    name: "Drivers' Championship",
+    startDate: "2026-03-07",
+    endDate: "2026-03-07",
+    location: "Online",
+    detailsUrl:
+      "https://www.nintendo.com/au/online-events/mario-kart-world/drivers-championship/",
+  },
+  {
+    id: "mkw-springtime-skirmish",
+    game: "mario-kart",
+    name: "European Springtime Skirmish",
+    startDate: "2026-04-25",
+    endDate: "2026-04-25",
+    location: "Online · Europe",
+    detailsUrl: "https://www.nintendo.com/en-gb/News/2026/June/Aim-for-the-horizon-in-the-first-Mario-Kart-World-global-online-event--3111588.html",
+  },
+  {
+    id: "mkw-global-online-challenge",
+    game: "mario-kart",
+    name: "Global Online Challenge",
+    startDate: "2026-06-05",
+    endDate: "2026-06-12",
+    location: "Online · Worldwide",
+    detailsUrl:
+      "https://www.nintendo.com/en-gb/News/2026/June/Aim-for-the-horizon-in-the-first-Mario-Kart-World-global-online-event--3111588.html",
+  },
+  {
+    id: "mkw-world-open-july",
+    game: "mario-kart",
+    name: "Mario Kart World Open — July",
+    startDate: "2026-07-18",
+    endDate: "2026-07-19",
+    location: "Online · Americas",
+    detailsUrl:
+      "https://www.nintendo.com/us/whatsnew/turn-up-the-heat-this-summer-in-the-mario-kart-world-open-july-2026-event/",
+  },
+  {
+    id: "mkwc-world-2026",
+    game: "mario-kart",
+    name: "MKWC World 2026 (community World Cup)",
+    startDate: "2026-09-01",
+    endDate: "2026-12-31",
+    dateNote: "Late 2026 · dates TBA",
+    detailsUrl: "https://mkcentral.com/en-us/tournaments/details?id=702",
+  },
+
+  // ---- Identity V 第五人格 (IJL=日本リーグ / IVL=中国リーグ / COA=世界大会) ----
+  {
+    id: "idv-coa-ix-world-finals",
+    game: "identity-v",
+    name: "Call of the Abyss IX — World Finals",
+    startDate: "2026-05-01",
+    endDate: "2026-05-05",
+    location: "World Championship",
+    detailsUrl: "https://esports-world.jp/tournament/59477",
+  },
+  {
+    id: "idv-ivl-2026-summer",
+    game: "identity-v",
+    name: "IVL 2026 Summer",
+    startDate: "2026-06-05",
+    endDate: "2026-08-23",
+    location: "China",
+    detailsUrl: "https://liquipedia.net/identityv/Main_Page",
+  },
+  {
+    id: "idv-ijl-2026-summer",
+    game: "identity-v",
+    name: "IJL 2026 Summer (Japan League)",
+    startDate: "2026-06-06",
+    endDate: "2026-08-02",
+    location: "Japan",
+    streamUrl: "https://www.youtube.com/channel/UCo5pHsgk0RaUek1ORd0PyXA",
+    detailsUrl: "https://www.identityv.jp/IJLleague/",
+  },
+  {
+    id: "idv-ijl-2026-autumn",
+    game: "identity-v",
+    name: "IJL 2026 Autumn (Japan League)",
+    startDate: "2026-09-01",
+    endDate: "2026-11-30",
+    dateNote: "Autumn 2026 · details TBA",
+    location: "Japan",
+    detailsUrl: "https://www.identityv.jp/IJLleague/",
+  },
 ];
 
 export function eventsForGame(gameSlug: string): ManualEvent[] {
