@@ -31,6 +31,11 @@ export const GAMES: GameConfig[] = [
   { slug: "tft", name: "Teamfight Tactics", short: "TFT", accent: "#f7a833", eventsOnly: true },
   { slug: "mario-kart", name: "Mario Kart World", short: "MK", accent: "#e60012", eventsOnly: true },
   { slug: "identity-v", name: "Identity V", short: "IDV", accent: "#a78bfa", eventsOnly: true },
+  { slug: "smash", name: "Super Smash Bros. Ultimate", short: "SSBU", accent: "#e64a3b", eventsOnly: true },
+  { slug: "sf6", name: "Street Fighter 6", short: "SF6", accent: "#2ea8e0", eventsOnly: true },
+  { slug: "pokemon", name: "Pokémon (WCS)", short: "PKM", accent: "#ffcb05", eventsOnly: true },
+  { slug: "splatoon", name: "Splatoon 3", short: "SPL", accent: "#b3f52b", eventsOnly: true },
+  { slug: "puyo-puyo", name: "Puyo Puyo", short: "PUYO", accent: "#4fc44f", eventsOnly: true },
 ];
 
 export const DEFAULT_GAME = GAMES[0];
