@@ -14,6 +14,7 @@ export const revalidate = 3600;
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [
     { url: BASE, changeFrequency: "hourly", priority: 1 },
+    { url: `${BASE}/ewc`, changeFrequency: "hourly", priority: 0.95 },
     ...GAMES.map((g) => ({
       url: `${BASE}/${g.slug}`,
       changeFrequency: "hourly" as const,
@@ -27,19 +28,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const from = new Date(todayUtc - 7 * DAY_MS);
   const to = new Date(todayUtc + 30 * DAY_MS);
 
-  for (const g of GAMES.filter((g) => !g.eventsOnly)) {
-    try {
-      const matches = await getMatches(g.slug, from, to);
-      const serieIds = [...new Set(matches.map((m) => m.serie.id))];
-      for (const id of serieIds) {
-        entries.push({
-          url: `${BASE}/${g.slug}/event/${id}`,
-          changeFrequency: "daily",
-          priority: 0.7,
-        });
-      }
-    } catch {
-      // 1ゲーム分の取得失敗でsitemap全体を壊さない
+  // 直列だと12ゲーム分の往復が積み重なりビルド時のタイムアウト(60秒)を
+  // 超えることがあるため並列で取得する
+  const perGame = await Promise.all(
+    GAMES.filter((g) => !g.eventsOnly).map((g) =>
+      getMatches(g.slug, from, to)
+        .then((matches) => ({ g, matches }))
+        .catch(() => ({ g, matches: [] as Awaited<ReturnType<typeof getMatches>> }))
+    )
+  );
+
+  for (const { g, matches } of perGame) {
+    const serieIds = [...new Set(matches.map((m) => m.serie.id))];
+    for (const id of serieIds) {
+      entries.push({
+        url: `${BASE}/${g.slug}/event/${id}`,
+        changeFrequency: "daily",
+        priority: 0.7,
+      });
     }
   }
 

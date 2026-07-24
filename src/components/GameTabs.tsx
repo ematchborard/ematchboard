@@ -23,6 +23,16 @@ export default function GameTabs() {
       >
         Home
       </Link>
+      <Link
+        href="/ewc"
+        className={`whitespace-nowrap border-b-2 pb-2 text-sm font-semibold transition-colors ${
+          pathname === "/ewc" || pathname.startsWith("/ewc/")
+            ? "border-amber-400 text-amber-400"
+            : "border-transparent text-muted hover:text-foreground"
+        }`}
+      >
+        🏆 EWC
+      </Link>
       {ready &&
         followed.map((game) => {
           const active =

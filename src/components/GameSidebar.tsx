@@ -91,6 +91,19 @@ export default function GameSidebar() {
         </span>
         Home
       </Link>
+      <Link
+        href="/ewc"
+        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+          isActive("ewc")
+            ? "bg-surface-hover text-amber-400"
+            : "text-muted hover:bg-surface-hover hover:text-foreground"
+        }`}
+      >
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-400/15 text-[10px] font-bold text-amber-400">
+          🏆
+        </span>
+        Esports World Cup
+      </Link>
 
       <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted">
         Following

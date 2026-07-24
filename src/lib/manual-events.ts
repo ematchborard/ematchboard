@@ -15,6 +15,7 @@ export interface ManualEvent {
   prizePool?: string;
   streamUrl?: string;
   detailsUrl?: string;
+  ewc?: boolean; // Esports World Cup 2026 の公式種目なら true (/ewc ハブに掲載)
 }
 
 export const MANUAL_EVENTS: ManualEvent[] = [
@@ -37,9 +38,11 @@ export const MANUAL_EVENTS: ManualEvent[] = [
     startDate: "2026-07-07",
     endDate: "2026-07-11",
     location: "Paris, France",
+    prizePool: "$2,000,000",
     streamUrl: "https://www.twitch.tv/playapex",
     detailsUrl:
       "https://liquipedia.net/apexlegends/Apex_Legends_Global_Series/2026/Split_1/Playoffs",
+    ewc: true,
   },
   {
     id: "algs-2026-championship",
@@ -101,6 +104,17 @@ export const MANUAL_EVENTS: ManualEvent[] = [
       "https://liquipedia.net/fortnite/Fortnite_Champion_Series/2026/Global_Championship",
   },
   {
+    id: "fortnite-ewc-2026",
+    game: "fortnite",
+    name: "Fortnite Reload Elite Series at Esports World Cup",
+    startDate: "2026-08-19",
+    endDate: "2026-08-22",
+    location: "Paris, France",
+    prizePool: "$1,000,000",
+    detailsUrl: "https://liquipedia.net/esports/Esports_World_Cup/2026",
+    ewc: true,
+  },
+  {
     id: "fncs-2026-solos",
     game: "fortnite",
     name: "FNCS Solos",
@@ -132,6 +146,17 @@ export const MANUAL_EVENTS: ManualEvent[] = [
     streamUrl: "https://www.twitch.tv/teamfighttactics",
     detailsUrl:
       "https://teamfighttactics.leagueoflegends.com/en-us/news/esports/tft-space-gods-tacticians-crown-announcement/",
+  },
+  {
+    id: "tft-ewc-2026",
+    game: "tft",
+    name: "Teamfight Tactics at Esports World Cup",
+    startDate: "2026-07-21",
+    endDate: "2026-07-25",
+    location: "Paris, France",
+    prizePool: "$500,000",
+    detailsUrl: "https://liquipedia.net/esports/Esports_World_Cup/2026",
+    ewc: true,
   },
   {
     id: "tft-set16-pro-circuit",
@@ -295,11 +320,12 @@ export const MANUAL_EVENTS: ManualEvent[] = [
     id: "sf6-ewc-2026",
     game: "sf6",
     name: "Street Fighter 6 at Esports World Cup",
-    startDate: "2026-07-06",
-    endDate: "2026-08-23",
-    dateNote: "July–August 2026 · EWC",
-    location: "Riyadh, Saudi Arabia",
+    startDate: "2026-07-29",
+    endDate: "2026-08-01",
+    location: "Paris, France",
+    prizePool: "$1,000,000",
     detailsUrl: "https://sf.esports.capcom.com/cpt/schedule/",
+    ewc: true,
   },
   {
     id: "sf6-capcom-cup-13",
@@ -376,6 +402,14 @@ export const MANUAL_EVENTS: ManualEvent[] = [
 
 export function eventsForGame(gameSlug: string): ManualEvent[] {
   return MANUAL_EVENTS.filter((e) => e.game === gameSlug).sort((a, b) =>
+    a.startDate.localeCompare(b.startDate)
+  );
+}
+
+// Esports World Cup 2026 の公式種目としてタグ付けされた手動イベント
+// (Apex/Fortnite/TFT/SF6 など、試合単位データを持たないタイトル向け)
+export function ewcManualEvents(): ManualEvent[] {
+  return MANUAL_EVENTS.filter((e) => e.ewc).sort((a, b) =>
     a.startDate.localeCompare(b.startDate)
   );
 }
