@@ -2,12 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMemo, useState } from "react";
 import { useFollowedGames, useFollowedTeams } from "@/lib/follow";
-import type { GameConfig } from "@/lib/games";
+import type { GameCategory, GameConfig } from "@/lib/games";
 
-// デスクトップ用の左サイドバー。フォロー中のゲームを上に、
-// その他のゲームは開閉式のセクションに隠し、その下にフォロー中チームを並べる。
-// ⭐でフォロー切替。
+// デスクトップ用の左サイドバー。FotMobの「トップリーグ / すべてのリーグ」に
+// 倣った3段構成: フォロー中 → 人気ゲーム(常時表示)→ その他(ジャンル別・折りたたみ+検索)。
+// ⭐でフォロー切替。フォローすると上の段に移動する。
+
+const CATEGORY_ORDER: GameCategory[] = [
+  "FPS",
+  "MOBA",
+  "Battle Royale",
+  "Fighting",
+  "Racing & Sports",
+  "Strategy",
+  "Other",
+];
 
 function GameRow({
   game,
@@ -58,11 +69,36 @@ function GameRow({
   );
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted">
+      {children}
+    </p>
+  );
+}
+
 export default function GameSidebar() {
   const pathname = usePathname();
   const { ready, followed, others, toggleFollow, showOthers, setShowOthers } =
     useFollowedGames();
   const { teams, toggleTeamFollow } = useFollowedTeams();
+  const [filter, setFilter] = useState("");
+
+  const popular = useMemo(() => others.filter((g) => g.popular), [others]);
+  const rest = useMemo(() => others.filter((g) => !g.popular), [others]);
+  const filteredRest = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return q ? rest.filter((g) => g.name.toLowerCase().includes(q)) : rest;
+  }, [rest, filter]);
+  const byCategory = useMemo(() => {
+    const map = new Map<GameCategory, GameConfig[]>();
+    for (const g of filteredRest) {
+      const list = map.get(g.category) ?? [];
+      list.push(g);
+      map.set(g.category, list);
+    }
+    return map;
+  }, [filteredRest]);
 
   if (!ready) {
     return (
@@ -105,9 +141,7 @@ export default function GameSidebar() {
         Esports World Cup
       </Link>
 
-      <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted">
-        Following
-      </p>
+      <SectionLabel>Following</SectionLabel>
       {followed.length === 0 ? (
         <p className="px-3 pb-2 text-xs text-muted">
           ☆を押してゲームをフォロー
@@ -124,34 +158,70 @@ export default function GameSidebar() {
         ))
       )}
 
-      {others.length > 0 && (
+      {popular.length > 0 && (
+        <>
+          <SectionLabel>Popular Games</SectionLabel>
+          {popular.map((game) => (
+            <GameRow
+              key={game.slug}
+              game={game}
+              active={isActive(game.slug)}
+              followed={false}
+              onToggle={() => toggleFollow(game.slug)}
+            />
+          ))}
+        </>
+      )}
+
+      {rest.length > 0 && (
         <>
           <button
             type="button"
             onClick={() => setShowOthers(!showOthers)}
             className="flex w-full items-center justify-between px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted transition-colors hover:text-foreground"
           >
-            Other games ({others.length})
+            All games ({rest.length})
             <span>{showOthers ? "▾" : "▸"}</span>
           </button>
-          {showOthers &&
-            others.map((game) => (
-              <GameRow
-                key={game.slug}
-                game={game}
-                active={isActive(game.slug)}
-                followed={false}
-                onToggle={() => toggleFollow(game.slug)}
-              />
-            ))}
+          {showOthers && (
+            <>
+              <div className="px-2 pb-1 pt-1">
+                <input
+                  type="text"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  placeholder="Search games…"
+                  className="w-full rounded-lg border border-border-subtle bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand"
+                />
+              </div>
+              {filteredRest.length === 0 ? (
+                <p className="px-3 pb-2 text-xs text-muted">No games found</p>
+              ) : (
+                CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((c) => (
+                  <div key={c}>
+                    <p className="px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted/70">
+                      {c}
+                    </p>
+                    {byCategory.get(c)!.map((game) => (
+                      <GameRow
+                        key={game.slug}
+                        game={game}
+                        active={isActive(game.slug)}
+                        followed={false}
+                        onToggle={() => toggleFollow(game.slug)}
+                      />
+                    ))}
+                  </div>
+                ))
+              )}
+            </>
+          )}
         </>
       )}
 
       {teams.length > 0 && (
         <>
-          <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted">
-            Teams
-          </p>
+          <SectionLabel>Teams</SectionLabel>
           {teams.map((team) => {
             const href = `/${team.game}/team/${team.id}`;
             const active = pathname === href;
