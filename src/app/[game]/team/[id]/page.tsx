@@ -39,7 +39,7 @@ export default async function TeamPage({ params }: Props) {
       <header className="flex items-center gap-4 rounded-xl border border-border-subtle bg-surface px-4 py-4">
         {team.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element -- 外部CDNのチームロゴ
-          <img src={team.image_url} alt="" className="logo-chip h-14 w-14 shrink-0 object-contain" />
+          <img src={team.image_url} alt="" className="h-14 w-14 shrink-0 object-contain" />
         ) : (
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-surface-hover text-lg font-bold text-muted">
             {(team.acronym ?? team.name).slice(0, 2).toUpperCase()}

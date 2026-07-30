@@ -42,11 +42,3 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
-
-/* チーム/リーグのロゴ下地。黒単色ロゴ(白背景用に作られたもの)が
-   ダークテーマで沈まないよう、白黒どちらのロゴも見える明るめグレーを敷く */
-.logo-chip {
-  background: #b7c0d1;
-  border-radius: 22%;
-  padding: 2px;
-}

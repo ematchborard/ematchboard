@@ -91,7 +91,7 @@ export default function MonthSummaryList({
         >
           {s.image ? (
             // eslint-disable-next-line @next/next/no-img-element -- 外部CDNのリーグロゴ
-            <img src={s.image} alt="" className="logo-chip h-10 w-10 shrink-0 object-contain" />
+            <img src={s.image} alt="" className="h-10 w-10 shrink-0 object-contain" />
           ) : (
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-hover text-xs font-bold text-muted">
               {s.label.slice(0, 2).toUpperCase()}

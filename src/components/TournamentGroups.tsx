@@ -90,7 +90,7 @@ export default function TournamentGroups({
               <img
                 src={group.image}
                 alt=""
-                className="logo-chip h-8 w-8 shrink-0 object-contain"
+                className="h-8 w-8 shrink-0 object-contain"
               />
             ) : (
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-hover text-[10px] font-bold text-muted">

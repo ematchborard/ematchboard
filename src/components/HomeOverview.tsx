@@ -34,7 +34,7 @@ function GameSection({
       <div className="mb-2 flex items-center gap-2">
         {game.logo ? (
           // eslint-disable-next-line @next/next/no-img-element -- 自前ホストのロゴ画像(public/game-logos)
-          <img src={game.logo} alt="" className="logo-chip h-7 w-7 shrink-0 object-contain" />
+          <img src={game.logo} alt="" className="h-7 w-7 shrink-0 object-contain" />
         ) : (
           <span
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[9px] font-bold"

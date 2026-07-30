@@ -92,7 +92,7 @@ export default async function EventPage({ params }: Props) {
           <img
             src={serie.league.image_url}
             alt=""
-            className="logo-chip h-16 w-16 shrink-0 object-contain"
+            className="h-16 w-16 shrink-0 object-contain"
           />
         ) : (
           <span

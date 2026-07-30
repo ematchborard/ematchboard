@@ -29,7 +29,7 @@ export const GAMES: GameConfig[] = [
   { slug: "lol", name: "League of Legends", short: "LoL", accent: "#0ac8b9", category: "MOBA", popular: true, logo: "/game-logos/lol.svg" },
   { slug: "csgo", name: "Counter-Strike 2", short: "CS2", accent: "#f5a623", category: "FPS", popular: true, logo: "/game-logos/csgo.svg" },
   { slug: "dota2", name: "Dota 2", short: "DOTA", accent: "#c23c2a", category: "MOBA", popular: true, logo: "/game-logos/dota2.svg" },
-  { slug: "ow", name: "Overwatch 2", short: "OW2", accent: "#fa9c1e", category: "FPS", popular: true, logo: "/game-logos/ow.svg" },
+  { slug: "ow", name: "Overwatch 2", short: "OW", accent: "#fa9c1e", category: "FPS", popular: true, logo: "/game-logos/ow.svg" },
   { slug: "r6siege", name: "Rainbow Six Siege", short: "R6", accent: "#35a8dd", category: "FPS" },
   { slug: "rl", name: "Rocket League", short: "RL", accent: "#1f8efa", category: "Racing & Sports", popular: true, logo: "/game-logos/rl.svg" },
   { slug: "mlbb", name: "Mobile Legends", short: "MLBB", accent: "#4a7dff", category: "MOBA" },

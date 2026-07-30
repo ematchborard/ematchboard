@@ -87,7 +87,7 @@ export default async function TournamentPage({ params }: Props) {
           <img
             src={tournament.league.image_url}
             alt=""
-            className="logo-chip h-16 w-16 shrink-0 object-contain"
+            className="h-16 w-16 shrink-0 object-contain"
           />
         ) : (
           <span
@@ -142,7 +142,7 @@ export default async function TournamentPage({ params }: Props) {
                 </span>
                 {s.team.image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element -- 外部CDNのチームロゴ
-                  <img src={s.team.image_url} alt="" className="logo-chip h-5 w-5 object-contain" />
+                  <img src={s.team.image_url} alt="" className="h-5 w-5 object-contain" />
                 ) : (
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-hover text-[9px] font-bold text-muted">
                     {(s.team.acronym ?? s.team.name).slice(0, 2).toUpperCase()}

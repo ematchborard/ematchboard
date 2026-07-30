@@ -13,7 +13,7 @@ function scoreFor(match: Match, team: Team | null): number | null {
 function TeamLogo({ team }: { team: Team | null }) {
   if (team?.image_url) {
     // eslint-disable-next-line @next/next/no-img-element -- 外部CDNのチームロゴ。ドメインが多数あるのでnext/imageは使わない
-    return <img src={team.image_url} alt="" className="logo-chip h-6 w-6 shrink-0 object-contain" />;
+    return <img src={team.image_url} alt="" className="h-6 w-6 shrink-0 object-contain" />;
   }
   return (
     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-hover text-[9px] font-bold text-muted">
