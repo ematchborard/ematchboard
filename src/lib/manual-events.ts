@@ -361,6 +361,50 @@ export const MANUAL_EVENTS: ManualEvent[] = [
     detailsUrl: "https://e-spogate.net/splatoon3/",
   },
 
+  // ---- PUBG Mobile (2026ロードマップ: PMGO x2, PMWC, PMGC) ----
+  {
+    id: "pubgm-pmgo-2026-s1",
+    game: "pubgm",
+    name: "PMGO 2026 Season 1",
+    startDate: "2026-06-02",
+    endDate: "2026-06-07",
+    location: "Jakarta, Indonesia",
+    prizePool: "$500,000",
+    detailsUrl: "https://liquipedia.net/pubgmobile/PUBG_Mobile_Global_Open/2026/Season_1",
+  },
+  {
+    id: "pubgm-pmwc-2026",
+    game: "pubgm",
+    name: "PUBG Mobile World Cup (PMWC) at Esports World Cup",
+    startDate: "2026-08-06",
+    endDate: "2026-08-16",
+    location: "Paris, France",
+    prizePool: "$3,000,000",
+    detailsUrl: "https://esportsworldcup.com/en/competitions/2026/pmwc",
+    ewc: true,
+  },
+  {
+    id: "pubgm-pmgo-2026-s2",
+    game: "pubgm",
+    name: "PMGO 2026 Season 2",
+    startDate: "2026-10-01",
+    endDate: "2026-10-31",
+    dateNote: "October 2026 · exact dates TBA",
+    location: "Pakistan",
+    prizePool: "$500,000",
+    detailsUrl: "https://liquipedia.net/pubgmobile/PUBG_Mobile_Global_Open/2026/Season_2",
+  },
+  {
+    id: "pubgm-pmgc-2026",
+    game: "pubgm",
+    name: "PUBG Mobile Global Championship (PMGC) 2026",
+    startDate: "2026-12-01",
+    endDate: "2026-12-13",
+    location: "Istanbul, Türkiye",
+    prizePool: "$1,500,000+",
+    detailsUrl: "https://pubgesports.com/en/news/10109",
+  },
+
   // ---- Puyo Puyo (セガ公式 Global Ranking Series 2026) ----
   {
     id: "puyo-grs-2026-1",
