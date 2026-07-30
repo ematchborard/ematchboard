@@ -32,12 +32,17 @@ function GameSection({
   return (
     <section>
       <div className="mb-2 flex items-center gap-2">
-        <span
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[9px] font-bold"
-          style={{ backgroundColor: `${game.accent}22`, color: game.accent }}
-        >
-          {game.short}
-        </span>
+        {game.logo ? (
+          // eslint-disable-next-line @next/next/no-img-element -- 自前ホストのロゴ画像(public/game-logos)
+          <img src={game.logo} alt="" className="logo-chip h-7 w-7 shrink-0 object-contain" />
+        ) : (
+          <span
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[9px] font-bold"
+            style={{ backgroundColor: `${game.accent}22`, color: game.accent }}
+          >
+            {game.short}
+          </span>
+        )}
         <Link
           href={`/${game.slug}`}
           className="truncate text-sm font-bold hover:underline"

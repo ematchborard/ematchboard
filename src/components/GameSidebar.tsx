@@ -7,8 +7,9 @@ import { useFollowedGames, useFollowedTeams } from "@/lib/follow";
 import type { GameCategory, GameConfig } from "@/lib/games";
 
 // デスクトップ用の左サイドバー。FotMobの「トップリーグ / すべてのリーグ」に
-// 倣った3段構成: フォロー中 → 人気ゲーム(常時表示)→ その他(ジャンル別・折りたたみ+検索)。
-// ⭐でフォロー切替。フォローすると上の段に移動する。
+// 倣い、セクションごとに独立したカードで区切る: 移動 → フォロー中 → 人気ゲーム
+// (常時表示)→ その他(ジャンル別・折りたたみ+検索)→ フォロー中チーム。
+// ⭐でフォロー切替。フォローすると上のカードに移動する。
 
 const CATEGORY_ORDER: GameCategory[] = [
   "FPS",
@@ -19,6 +20,27 @@ const CATEGORY_ORDER: GameCategory[] = [
   "Strategy",
   "Other",
 ];
+
+function GameLogo({ game }: { game: GameConfig }) {
+  if (game.logo) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- 自前ホストのロゴ画像(public/game-logos)
+      <img
+        src={game.logo}
+        alt=""
+        className="logo-chip h-6 w-6 shrink-0 object-contain"
+      />
+    );
+  }
+  return (
+    <span
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[8px] font-bold"
+      style={{ backgroundColor: `${game.accent}22`, color: game.accent }}
+    >
+      {game.short}
+    </span>
+  );
+}
 
 function GameRow({
   game,
@@ -44,12 +66,7 @@ function GameRow({
         }`}
         style={active ? { color: game.accent } : undefined}
       >
-        <span
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[8px] font-bold"
-          style={{ backgroundColor: `${game.accent}22`, color: game.accent }}
-        >
-          {game.short}
-        </span>
+        <GameLogo game={game} />
         <span className="truncate">{game.name}</span>
       </Link>
       <button
@@ -69,9 +86,17 @@ function GameRow({
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function Card({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted">
+    <div className="rounded-xl border border-border-subtle bg-surface p-2">
+      {children}
+    </div>
+  );
+}
+
+function CardLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
       {children}
     </p>
   );
@@ -113,54 +138,58 @@ export default function GameSidebar() {
     pathname === `/${slug}` || pathname.startsWith(`/${slug}/`);
 
   return (
-    <nav className="sticky top-20 rounded-xl border border-border-subtle bg-surface p-2">
-      <Link
-        href="/"
-        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-          pathname === "/"
-            ? "bg-surface-hover text-brand"
-            : "text-muted hover:bg-surface-hover hover:text-foreground"
-        }`}
-      >
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-[10px] font-bold text-brand">
-          ⌂
-        </span>
-        Home
-      </Link>
-      <Link
-        href="/ewc"
-        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-          isActive("ewc")
-            ? "bg-surface-hover text-amber-400"
-            : "text-muted hover:bg-surface-hover hover:text-foreground"
-        }`}
-      >
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-400/15 text-[10px] font-bold text-amber-400">
-          🏆
-        </span>
-        Esports World Cup
-      </Link>
+    <nav className="sticky top-20 flex flex-col gap-3">
+      <Card>
+        <Link
+          href="/"
+          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+            pathname === "/"
+              ? "bg-surface-hover text-brand"
+              : "text-muted hover:bg-surface-hover hover:text-foreground"
+          }`}
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-[10px] font-bold text-brand">
+            ⌂
+          </span>
+          Home
+        </Link>
+        <Link
+          href="/ewc"
+          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+            isActive("ewc")
+              ? "bg-surface-hover text-amber-400"
+              : "text-muted hover:bg-surface-hover hover:text-foreground"
+          }`}
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-400/15 text-[10px] font-bold text-amber-400">
+            🏆
+          </span>
+          Esports World Cup
+        </Link>
+      </Card>
 
-      <SectionLabel>Following</SectionLabel>
-      {followed.length === 0 ? (
-        <p className="px-3 pb-2 text-xs text-muted">
-          ☆を押してゲームをフォロー
-        </p>
-      ) : (
-        followed.map((game) => (
-          <GameRow
-            key={game.slug}
-            game={game}
-            active={isActive(game.slug)}
-            followed
-            onToggle={() => toggleFollow(game.slug)}
-          />
-        ))
-      )}
+      <Card>
+        <CardLabel>Following</CardLabel>
+        {followed.length === 0 ? (
+          <p className="px-3 pb-2 text-xs text-muted">
+            ☆を押してゲームをフォロー
+          </p>
+        ) : (
+          followed.map((game) => (
+            <GameRow
+              key={game.slug}
+              game={game}
+              active={isActive(game.slug)}
+              followed
+              onToggle={() => toggleFollow(game.slug)}
+            />
+          ))
+        )}
+      </Card>
 
       {popular.length > 0 && (
-        <>
-          <SectionLabel>Popular Games</SectionLabel>
+        <Card>
+          <CardLabel>Popular Games</CardLabel>
           {popular.map((game) => (
             <GameRow
               key={game.slug}
@@ -170,15 +199,15 @@ export default function GameSidebar() {
               onToggle={() => toggleFollow(game.slug)}
             />
           ))}
-        </>
+        </Card>
       )}
 
       {rest.length > 0 && (
-        <>
+        <Card>
           <button
             type="button"
             onClick={() => setShowOthers(!showOthers)}
-            className="flex w-full items-center justify-between px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted transition-colors hover:text-foreground"
+            className="flex w-full items-center justify-between px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted transition-colors hover:text-foreground"
           >
             All games ({rest.length})
             <span>{showOthers ? "▾" : "▸"}</span>
@@ -216,12 +245,12 @@ export default function GameSidebar() {
               )}
             </>
           )}
-        </>
+        </Card>
       )}
 
       {teams.length > 0 && (
-        <>
-          <SectionLabel>Teams</SectionLabel>
+        <Card>
+          <CardLabel>Teams</CardLabel>
           {teams.map((team) => {
             const href = `/${team.game}/team/${team.id}`;
             const active = pathname === href;
@@ -264,7 +293,7 @@ export default function GameSidebar() {
               </div>
             );
           })}
-        </>
+        </Card>
       )}
     </nav>
   );

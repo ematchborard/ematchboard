@@ -42,6 +42,27 @@ export default function AboutPage() {
         </p>
       </section>
 
+      <section>
+        <h2 className="mb-1 font-semibold">Trademarks</h2>
+        <p className="text-muted">
+          eMATCH BOARD is an unofficial, fan-made schedule aggregator and is
+          not affiliated with, endorsed by, or sponsored by any game
+          publisher or league. All game titles, team names and logos are
+          trademarks of their respective owners, used here only to identify
+          the games and tournaments covered. The Rocket League logo is used
+          under{" "}
+          <a
+            href="https://creativecommons.org/licenses/by-sa/4.0/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-foreground"
+          >
+            CC BY-SA 4.0
+          </a>{" "}
+          (© Psyonix, Inc., via Wikimedia Commons).
+        </p>
+      </section>
+
       <p className="text-muted">
         Questions or feedback: ematchboard@gmail.com ·{" "}
         <Link href="/privacy" className="underline hover:text-foreground">
