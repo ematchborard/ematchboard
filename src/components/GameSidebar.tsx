@@ -28,7 +28,7 @@ function GameLogo({ game }: { game: GameConfig }) {
       <img
         src={game.logo}
         alt=""
-        className="h-6 w-6 shrink-0 object-contain"
+        className={`h-6 w-6 shrink-0 object-contain ${game.logoFixedColor ? "" : "game-logo-auto"}`}
       />
     );
   }

@@ -17,6 +17,10 @@ export interface GameConfig {
   short: string; // サイドバーのアイコン用略称(ロゴ画像が無いときのフォールバック表示)
   accent: string; // タブ/サイドバーのアクティブ色
   logo?: string; // /public 配下の自前ホストロゴ画像パス。無ければshort+accentの色付きバッジにフォールバック
+  // true = ライトモードでも色を反転しない(白黒混在など、元々どちらのテーマでも
+  // 見やすい配色のロゴ)。未指定(false)のロゴは白色前提で、ライトモード時に
+  // CSSで自動反転して黒にする(globals.cssの .game-logo-auto を参照)
+  logoFixedColor?: boolean;
   category: GameCategory; // サイドバーの「All games」内でのジャンル分け
   popular?: boolean; // true = サイドバーの「Popular Games」に常時表示(未フォロー時)
   // true = PandaScore非対応のバトロワ系など。試合単位のデータは無く、
@@ -28,13 +32,13 @@ export const GAMES: GameConfig[] = [
   { slug: "valorant", name: "VALORANT", short: "VAL", accent: "#ff4655", category: "FPS", popular: true, logo: "/game-logos/valorant.png" },
   { slug: "lol", name: "League of Legends", short: "LoL", accent: "#0ac8b9", category: "MOBA", popular: true, logo: "/game-logos/lol.png" },
   { slug: "csgo", name: "Counter-Strike 2", short: "CS2", accent: "#f5a623", category: "FPS", popular: true, logo: "/game-logos/csgo.png" },
-  { slug: "dota2", name: "Dota 2", short: "DOTA", accent: "#c23c2a", category: "MOBA", popular: true, logo: "/game-logos/dota2.png" },
+  { slug: "dota2", name: "Dota 2", short: "DOTA", accent: "#c23c2a", category: "MOBA", popular: true, logo: "/game-logos/dota2.png", logoFixedColor: true },
   { slug: "ow", name: "Overwatch 2", short: "OW", accent: "#fa9c1e", category: "FPS", popular: true, logo: "/game-logos/ow.png" },
   { slug: "r6siege", name: "Rainbow Six Siege", short: "R6", accent: "#35a8dd", category: "FPS", logo: "/game-logos/r6siege.png" },
   { slug: "rl", name: "Rocket League", short: "RL", accent: "#1f8efa", category: "Racing & Sports", popular: true, logo: "/game-logos/rl.png" },
   { slug: "mlbb", name: "Mobile Legends", short: "MLBB", accent: "#4a7dff", category: "MOBA", logo: "/game-logos/mlbb.png" },
-  { slug: "pubg", name: "PUBG: BATTLEGROUNDS", short: "PUBG", accent: "#f2a900", category: "Battle Royale", logo: "/game-logos/pubg.png" },
-  { slug: "pubgm", name: "PUBG Mobile", short: "PUBGM", accent: "#ff8a00", category: "Battle Royale", eventsOnly: true, logo: "/game-logos/pubgm.png" },
+  { slug: "pubg", name: "PUBG: BATTLEGROUNDS", short: "PUBG", accent: "#f2a900", category: "Battle Royale", logo: "/game-logos/pubg.png", logoFixedColor: true },
+  { slug: "pubgm", name: "PUBG Mobile", short: "PUBGM", accent: "#ff8a00", category: "Battle Royale", eventsOnly: true, logo: "/game-logos/pubgm.png", logoFixedColor: true },
   { slug: "codmw", name: "Call of Duty", short: "COD", accent: "#7ac142", category: "FPS", popular: true, logo: "/game-logos/codmw.svg" },
   { slug: "fifa", name: "EA Sports FC", short: "FC", accent: "#2ecc71", category: "Racing & Sports", logo: "/game-logos/fifa.png" },
   { slug: "starcraft-2", name: "StarCraft 2", short: "SC2", accent: "#8fb8ff", category: "Strategy", logo: "/game-logos/starcraft-2.png" },
@@ -47,7 +51,7 @@ export const GAMES: GameConfig[] = [
   { slug: "smash", name: "Super Smash Bros. Ultimate", short: "SSBU", accent: "#e64a3b", category: "Fighting", eventsOnly: true, logo: "/game-logos/smash.png" },
   { slug: "sf6", name: "Street Fighter 6", short: "SF6", accent: "#2ea8e0", category: "Fighting", eventsOnly: true, logo: "/game-logos/sf6.png" },
   { slug: "pokemon", name: "Pokémon (WCS)", short: "PKM", accent: "#ffcb05", category: "Strategy", eventsOnly: true, logo: "/game-logos/pokemon.png" },
-  { slug: "splatoon", name: "Splatoon 3", short: "SPL", accent: "#b3f52b", category: "FPS", eventsOnly: true, logo: "/game-logos/splatoon.png" },
+  { slug: "splatoon", name: "Splatoon 3", short: "SPL", accent: "#b3f52b", category: "FPS", eventsOnly: true, logo: "/game-logos/splatoon.png", logoFixedColor: true },
   { slug: "puyo-puyo", name: "Puyo Puyo", short: "PUYO", accent: "#4fc44f", category: "Other", eventsOnly: true, logo: "/game-logos/puyo-puyo.png" },
 ];
 

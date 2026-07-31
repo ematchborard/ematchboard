@@ -42,3 +42,10 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* ゲームロゴは基本ダークテーマ向け(白色)で用意しているため、ライトモードでは
+   自動的に反転して黒にする(白黒混在など元々どちらでも見やすいロゴは
+   logoFixedColor:true でこのクラスを付けず対象外にする)。 */
+:root[data-theme="light"] .game-logo-auto {
+  filter: invert(1);
+}
