@@ -442,6 +442,60 @@ export const MANUAL_EVENTS: ManualEvent[] = [
     location: "Japan",
     detailsUrl: "https://esports.sega.jp/puyo/",
   },
+
+  // ---- Clash Royale (CRL 2026, Supercell公式) ----
+  {
+    id: "crl-2026-monthly-finals",
+    game: "clash-royale",
+    name: "CRL 2026 Monthly Finals (Seasons 1–4)",
+    startDate: "2026-04-01",
+    endDate: "2026-08-31",
+    dateNote: "April–August 2026 · four $51,400 monthly finals",
+    location: "Online",
+    prizePool: "$51,400 per season",
+    detailsUrl: "https://liquipedia.net/clashroyale/Clash_Royale_League/2026",
+  },
+  {
+    id: "crl-2026-world-finals",
+    game: "clash-royale",
+    name: "CRL 2026 World Finals",
+    startDate: "2026-12-01",
+    endDate: "2026-12-31",
+    dateNote: "December 2026 · exact dates TBA",
+    detailsUrl: "https://liquipedia.net/clashroyale/Clash_Royale_League/2026/World_Finals",
+  },
+
+  // ---- Brawl Stars (Brawl Stars Championship 2026, 賞金総額$2M) ----
+  {
+    id: "bsc-2026-brawl-cup",
+    game: "brawl-stars",
+    name: "Brawl Stars Championship: Brawl Cup",
+    startDate: "2026-05-15",
+    endDate: "2026-05-17",
+    location: "Berlin, Germany",
+    prizePool: "$100,000",
+    detailsUrl: "https://liquipedia.net/brawlstars/Brawl_Stars_Championship/2026/Brawl_Cup",
+  },
+  {
+    id: "bsc-2026-last-chance",
+    game: "brawl-stars",
+    name: "Brawl Stars Championship: Last Chance Qualifier",
+    startDate: "2026-10-01",
+    endDate: "2026-10-31",
+    dateNote: "October 2026 · exact dates TBA",
+    location: "Online",
+    detailsUrl: "https://liquipedia.net/brawlstars/Brawl_Stars_Championship/2026/Overview",
+  },
+  {
+    id: "bsc-2026-world-finals",
+    game: "brawl-stars",
+    name: "Brawl Stars World Finals",
+    startDate: "2026-11-20",
+    endDate: "2026-11-22",
+    location: "Tokyo, Japan",
+    prizePool: "$1,000,000",
+    detailsUrl: "https://liquipedia.net/brawlstars/Brawl_Stars_World_Finals/2026",
+  },
 ];
 
 export function eventsForGame(gameSlug: string): ManualEvent[] {

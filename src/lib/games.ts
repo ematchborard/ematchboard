@@ -53,6 +53,8 @@ export const GAMES: GameConfig[] = [
   { slug: "pokemon", name: "Pokémon (WCS)", short: "PKM", accent: "#ffcb05", category: "Strategy", eventsOnly: true, logo: "/game-logos/pokemon.png" },
   { slug: "splatoon", name: "Splatoon 3", short: "SPL", accent: "#b3f52b", category: "FPS", eventsOnly: true, logo: "/game-logos/splatoon.png", logoFixedColor: true },
   { slug: "puyo-puyo", name: "Puyo Puyo", short: "PUYO", accent: "#4fc44f", category: "Other", eventsOnly: true, logo: "/game-logos/puyo-puyo.png" },
+  { slug: "clash-royale", name: "Clash Royale", short: "CR", accent: "#f2b90c", category: "Strategy", eventsOnly: true },
+  { slug: "brawl-stars", name: "Brawl Stars", short: "BS", accent: "#8b5cf6", category: "Other", eventsOnly: true },
 ];
 
 export const DEFAULT_GAME = GAMES[0];
