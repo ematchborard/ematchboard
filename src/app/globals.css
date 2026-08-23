@@ -2,10 +2,10 @@
 
 /* デフォルトはダーク(esports系の定番)。ライトは data-theme="light" で切替 */
 :root {
-  --background: #0c0f16;
-  --surface: #151a24;
-  --surface-hover: #1b2130;
-  --border: #232a3a;
+  --background: #12161f;
+  --surface: #1a212e;
+  --surface-hover: #212a3a;
+  --border: #2c3548;
   --foreground: #e8ebf2;
   --muted: #8b94a7;
   --brand: #22d3ee;
