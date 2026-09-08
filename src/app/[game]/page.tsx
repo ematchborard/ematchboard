@@ -73,15 +73,32 @@ export default async function GamePage({ params, searchParams }: Props) {
   return (
     <div>
       {/* 検索エンジン向けのサーバー描画テキスト(リスト本体はクライアント描画のため) */}
-      <div className="mb-3">
-        <h1 className="text-lg font-bold">
-          {config.name} Esports Schedule & Results
-        </h1>
-        <p className="mt-0.5 text-xs text-muted">
-          Upcoming {config.name} matches, live scores, brackets and standings —
-          in your local timezone.
-          {topEvents.length > 0 && ` Now on: ${topEvents.join(" · ")}.`}
-        </p>
+      <div className="mb-3 flex items-center gap-3">
+        {config.logo ? (
+          // eslint-disable-next-line @next/next/no-img-element -- 自前ホストのロゴ画像(public/game-logos)
+          <img
+            src={config.logo}
+            alt=""
+            className={`h-9 w-9 shrink-0 object-contain ${config.logoFixedColor ? "" : "game-logo-auto"}`}
+          />
+        ) : (
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
+            style={{ backgroundColor: `${config.accent}22`, color: config.accent }}
+          >
+            {config.short}
+          </span>
+        )}
+        <div>
+          <h1 className="text-lg font-bold">
+            {config.name} Esports Schedule & Results
+          </h1>
+          <p className="mt-0.5 text-xs text-muted">
+            Upcoming {config.name} matches, live scores, brackets and standings —
+            in your local timezone.
+            {topEvents.length > 0 && ` Now on: ${topEvents.join(" · ")}.`}
+          </p>
+        </div>
       </div>
       {config.liveSource !== "startgg" && !hasApiToken() && (
         <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
