@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { GAMES } from "@/lib/games";
 import { getMatches, hasApiToken } from "@/lib/pandascore";
+import { getStartggMatches, type StartggGameSlug } from "@/lib/startgg";
 import {
   parseDateParam,
   parseOffset,
@@ -36,7 +37,10 @@ async function HomeMatchData({
   const perGame = await Promise.all(
     GAMES.filter((g) => !g.eventsOnly).map(async (g) => ({
       slug: g.slug,
-      matches: await getMatches(g.slug, from, to).catch(() => []),
+      matches: await (g.liveSource === "startgg"
+        ? getStartggMatches(g.slug as StartggGameSlug, from, to)
+        : getMatches(g.slug, from, to)
+      ).catch(() => []),
     }))
   );
 

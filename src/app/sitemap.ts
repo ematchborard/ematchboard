@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { GAMES } from "@/lib/games";
 import { getMatches } from "@/lib/pandascore";
+import { getStartggMatches, type StartggGameSlug } from "@/lib/startgg";
 
 // サイトマップ。固定ページに加えて「直近1週間〜今後1ヶ月に試合がある大会ページ」を
 // 動的に載せる(プログラマティックSEOの本体: 大会名での検索流入の入口になる)。
@@ -32,7 +33,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 超えることがあるため並列で取得する
   const perGame = await Promise.all(
     GAMES.filter((g) => !g.eventsOnly).map((g) =>
-      getMatches(g.slug, from, to)
+      (g.liveSource === "startgg"
+        ? getStartggMatches(g.slug as StartggGameSlug, from, to)
+        : getMatches(g.slug, from, to)
+      )
         .then((matches) => ({ g, matches }))
         .catch(() => ({ g, matches: [] as Awaited<ReturnType<typeof getMatches>> }))
     )

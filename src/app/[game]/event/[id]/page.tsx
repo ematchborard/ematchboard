@@ -7,6 +7,11 @@ import {
   getSerieMatches,
   getSerieTournaments,
 } from "@/lib/pandascore";
+import {
+  getStartggSerie,
+  getStartggSerieMatches,
+  getStartggSerieTournaments,
+} from "@/lib/startgg";
 import { jsonLdString } from "@/lib/seo";
 import StageTabs from "@/components/StageTabs";
 import TournamentSchedule from "@/components/TournamentSchedule";
@@ -20,8 +25,12 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = await params;
-  const serie = await getSerie(Number(id));
+  const { game, id } = await params;
+  const config = getGame(game);
+  const serie =
+    config?.liveSource === "startgg"
+      ? await getStartggSerie(Number(id))
+      : await getSerie(Number(id));
   const title = serie
     ? `${serie.league.name} ${serie.full_name ?? ""}`.trim()
     : "Event";
@@ -34,11 +43,18 @@ export default async function EventPage({ params }: Props) {
   const id = Number(idParam);
   if (!config || !Number.isFinite(id)) notFound();
 
-  const [serie, stages, matches] = await Promise.all([
-    getSerie(id),
-    getSerieTournaments(id),
-    getSerieMatches(id),
-  ]);
+  const [serie, stages, matches] =
+    config.liveSource === "startgg"
+      ? await Promise.all([
+          getStartggSerie(id),
+          getStartggSerieTournaments(id),
+          getStartggSerieMatches(id),
+        ])
+      : await Promise.all([
+          getSerie(id),
+          getSerieTournaments(id),
+          getSerieMatches(id),
+        ]);
   if (!serie) notFound();
 
   const title = `${serie.league.name} ${serie.full_name ?? ""}`.trim();

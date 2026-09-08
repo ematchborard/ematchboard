@@ -26,6 +26,9 @@ export interface GameConfig {
   // true = PandaScore非対応のバトロワ系など。試合単位のデータは無く、
   // 大会スケジュール(lib/manual-events.ts で手動管理)だけを表示する
   eventsOnly?: boolean;
+  // 試合データをPandaScore以外から取る場合の取得元。"startgg" = start.gg API
+  // (lib/startgg.ts で厳選したメジャー大会シリーズのみを追跡)
+  liveSource?: "startgg";
 }
 
 export const GAMES: GameConfig[] = [
@@ -48,13 +51,14 @@ export const GAMES: GameConfig[] = [
   { slug: "tft", name: "Teamfight Tactics", short: "TFT", accent: "#f7a833", category: "Strategy", eventsOnly: true, logo: "/game-logos/tft.png" },
   { slug: "mario-kart", name: "Mario Kart World", short: "MK", accent: "#e60012", category: "Racing & Sports", eventsOnly: true, logo: "/game-logos/mario-kart.png" },
   { slug: "identity-v", name: "Identity V", short: "IDV", accent: "#a78bfa", category: "Other", eventsOnly: true, logo: "/game-logos/identity-v.png" },
-  { slug: "smash", name: "Super Smash Bros. Ultimate", short: "SSBU", accent: "#e64a3b", category: "Fighting", eventsOnly: true, logo: "/game-logos/smash.png" },
-  { slug: "sf6", name: "Street Fighter 6", short: "SF6", accent: "#2ea8e0", category: "Fighting", eventsOnly: true, logo: "/game-logos/sf6.png" },
+  { slug: "smash", name: "Super Smash Bros. Ultimate", short: "SSBU", accent: "#e64a3b", category: "Fighting", liveSource: "startgg", logo: "/game-logos/smash.png" },
+  { slug: "sf6", name: "Street Fighter 6", short: "SF6", accent: "#2ea8e0", category: "Fighting", liveSource: "startgg", logo: "/game-logos/sf6.png" },
   { slug: "pokemon", name: "Pokémon (WCS)", short: "PKM", accent: "#ffcb05", category: "Strategy", eventsOnly: true, logo: "/game-logos/pokemon.png" },
   { slug: "splatoon", name: "Splatoon 3", short: "SPL", accent: "#b3f52b", category: "FPS", eventsOnly: true, logo: "/game-logos/splatoon.png", logoFixedColor: true },
   { slug: "puyo-puyo", name: "Puyo Puyo", short: "PUYO", accent: "#4fc44f", category: "Other", eventsOnly: true, logo: "/game-logos/puyo-puyo.png" },
   { slug: "clash-royale", name: "Clash Royale", short: "CR", accent: "#f2b90c", category: "Strategy", eventsOnly: true, logo: "/game-logos/clash-royale.png" },
   { slug: "brawl-stars", name: "Brawl Stars", short: "BS", accent: "#8b5cf6", category: "Other", eventsOnly: true, logo: "/game-logos/brawl-stars.png" },
+  { slug: "geoguessr", name: "GeoGuessr", short: "GEO", accent: "#dd3f3f", category: "Other", eventsOnly: true, logo: "/game-logos/geoguessr.png" },
 ];
 
 export const DEFAULT_GAME = GAMES[0];

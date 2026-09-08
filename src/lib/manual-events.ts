@@ -496,6 +496,36 @@ export const MANUAL_EVENTS: ManualEvent[] = [
     prizePool: "$1,000,000",
     detailsUrl: "https://liquipedia.net/brawlstars/Brawl_Stars_World_Finals/2026",
   },
+
+  // ---- GeoGuessr (World Championship 2026、公式サイト運営で構造化APIなし) ----
+  {
+    id: "geoguessr-wc-2026-world-league",
+    game: "geoguessr",
+    name: "World Championship 2026: World League (EMEA/Americas/APAC)",
+    startDate: "2026-01-18",
+    endDate: "2026-05-24",
+    location: "Online",
+    prizePool: "$88,000",
+    detailsUrl: "https://liquipedia.net/geoguessr/GeoGuessr_World_Championship/2026/World_League",
+  },
+  {
+    id: "geoguessr-wc-2026-play-in",
+    game: "geoguessr",
+    name: "World Championship 2026: Play-In",
+    startDate: "2026-06-06",
+    endDate: "2026-06-07",
+    location: "Online",
+    detailsUrl: "https://liquipedia.net/geoguessr/GeoGuessr_World_Championship/2026/Play-in",
+  },
+  {
+    id: "geoguessr-wc-2026-finals",
+    game: "geoguessr",
+    name: "World Championship 2026: Finals",
+    startDate: "2026-09-02",
+    endDate: "2026-09-05",
+    location: "Tempodrom, Berlin",
+    detailsUrl: "https://www.geoguessr.com/world-championship/berlin",
+  },
 ];
 
 export function eventsForGame(gameSlug: string): ManualEvent[] {

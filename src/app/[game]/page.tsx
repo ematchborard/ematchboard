@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getGame } from "@/lib/games";
 import { getMatches, hasApiToken } from "@/lib/pandascore";
+import { getStartggMatches, type StartggGameSlug } from "@/lib/startgg";
 import {
   parseDateParam,
   parseOffset,
@@ -62,7 +63,10 @@ export default async function GamePage({ params, searchParams }: Props) {
   const dateStr = parseDateParam(sp.d);
 
   const { from, to } = rangeFor(view, offset, dateStr);
-  const matches = await getMatches(config.slug, from, to);
+  const matches =
+    config.liveSource === "startgg"
+      ? await getStartggMatches(config.slug as StartggGameSlug, from, to)
+      : await getMatches(config.slug, from, to);
   const basePath = `/${config.slug}`;
   const topEvents = topEventNames(matches, config.slug);
 
@@ -79,7 +83,7 @@ export default async function GamePage({ params, searchParams }: Props) {
           {topEvents.length > 0 && ` Now on: ${topEvents.join(" · ")}.`}
         </p>
       </div>
-      {!hasApiToken() && (
+      {config.liveSource !== "startgg" && !hasApiToken() && (
         <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
           サンプルデータを表示中 — <code>.env.local</code> に{" "}
           <code>PANDASCORE_TOKEN</code> を設定すると実データに切り替わります

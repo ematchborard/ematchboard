@@ -7,7 +7,8 @@ import {
   getTeam,
   getTeamRecentMatches,
 } from "@/lib/pandascore";
-import type { Match, Team } from "@/lib/types";
+import { getStartggMatch } from "@/lib/startgg";
+import type { Match, MatchDetail, Team, TeamDetail } from "@/lib/types";
 import { jsonLdString } from "@/lib/seo";
 import LocalTime from "@/components/LocalTime";
 import MatchLineups from "@/components/MatchLineups";
@@ -23,13 +24,45 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = await params;
-  const match = await getMatch(Number(id));
+  const { game, id } = await params;
+  const config = getGame(game);
+  const match =
+    config?.liveSource === "startgg"
+      ? (await getStartggMatch(Number(id)))?.match ?? null
+      : await getMatch(Number(id));
   const a = match?.opponents[0]?.opponent?.name ?? "TBD";
   const b = match?.opponents[1]?.opponent?.name ?? "TBD";
   return {
     title: match ? `${a} vs ${b} — eMATCH BOARD` : "Match — eMATCH BOARD",
   };
+}
+
+// start.gg 出典の試合はチーム(エントラント)がイベント毎の一時登録で永続IDが
+// 無いため、チームページへのリンクは張らずテキスト表示のみにする
+function TeamHeader({
+  team,
+  href,
+  dim,
+}: {
+  team: Team | null;
+  href: string | null;
+  dim: boolean;
+}) {
+  const content = (
+    <>
+      <TeamLogo team={team} size="h-14 w-14" />
+      <span className={`w-full truncate text-sm font-semibold ${dim ? "opacity-50" : ""}`}>
+        {team?.name ?? "TBD"}
+      </span>
+    </>
+  );
+  const className = "flex min-w-0 flex-1 flex-col items-center gap-2 text-center";
+  if (!href) return <div className={className}>{content}</div>;
+  return (
+    <Link href={href} className={className}>
+      {content}
+    </Link>
+  );
 }
 
 function TeamLogo({ team, size }: { team: Team | null; size: string }) {
@@ -62,17 +95,34 @@ export default async function MatchPage({ params }: Props) {
   const id = Number(idParam);
   if (!config || !Number.isFinite(id)) notFound();
 
-  const match = await getMatch(id);
-  if (!match) notFound();
+  const isStartgg = config.liveSource === "startgg";
+  let match: MatchDetail | null;
+  let teamA: TeamDetail | null;
+  let teamB: TeamDetail | null;
+  let recentA: Match[] = [];
+  let recentB: Match[] = [];
+
+  if (isStartgg) {
+    const result = await getStartggMatch(id);
+    if (!result) notFound();
+    match = result.match;
+    teamA = result.teamA;
+    teamB = result.teamB;
+  } else {
+    match = await getMatch(id);
+    if (!match) notFound();
+    const refA = match.opponents[0]?.opponent ?? null;
+    const refB = match.opponents[1]?.opponent ?? null;
+    [teamA, teamB, recentA, recentB] = await Promise.all([
+      refA ? getTeam(refA.id) : Promise.resolve(null),
+      refB ? getTeam(refB.id) : Promise.resolve(null),
+      refA ? getTeamRecentMatches(refA.id) : Promise.resolve([]),
+      refB ? getTeamRecentMatches(refB.id) : Promise.resolve([]),
+    ]);
+  }
 
   const teamARef = match.opponents[0]?.opponent ?? null;
   const teamBRef = match.opponents[1]?.opponent ?? null;
-  const [teamA, teamB, recentA, recentB] = await Promise.all([
-    teamARef ? getTeam(teamARef.id) : Promise.resolve(null),
-    teamBRef ? getTeam(teamBRef.id) : Promise.resolve(null),
-    teamARef ? getTeamRecentMatches(teamARef.id) : Promise.resolve([]),
-    teamBRef ? getTeamRecentMatches(teamBRef.id) : Promise.resolve([]),
-  ]);
 
   const scoreOf = (team: Team | null) =>
     team ? (match.results.find((r) => r.team_id === team.id)?.score ?? null) : null;
@@ -140,19 +190,13 @@ export default async function MatchPage({ params }: Props) {
           {eventName} · {match.tournament.name} · BO{match.number_of_games}
         </p>
         <div className="flex items-center justify-between gap-2">
-          <Link
-            href={teamARef ? `/${config.slug}/team/${teamARef.id}` : "#"}
-            className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center"
-          >
-            <TeamLogo team={teamARef} size="h-14 w-14" />
-            <span
-              className={`w-full truncate text-sm font-semibold ${
-                finished && match.winner_id !== teamARef?.id ? "opacity-50" : ""
-              }`}
-            >
-              {teamARef?.name ?? "TBD"}
-            </span>
-          </Link>
+          <TeamHeader
+            team={teamARef}
+            href={
+              !isStartgg && teamARef ? `/${config.slug}/team/${teamARef.id}` : null
+            }
+            dim={finished && match.winner_id !== teamARef?.id}
+          />
 
           <div className="shrink-0 px-2 text-center">
             {finished || running ? (
@@ -178,19 +222,13 @@ export default async function MatchPage({ params }: Props) {
             )}
           </div>
 
-          <Link
-            href={teamBRef ? `/${config.slug}/team/${teamBRef.id}` : "#"}
-            className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center"
-          >
-            <TeamLogo team={teamBRef} size="h-14 w-14" />
-            <span
-              className={`w-full truncate text-sm font-semibold ${
-                finished && match.winner_id !== teamBRef?.id ? "opacity-50" : ""
-              }`}
-            >
-              {teamBRef?.name ?? "TBD"}
-            </span>
-          </Link>
+          <TeamHeader
+            team={teamBRef}
+            href={
+              !isStartgg && teamBRef ? `/${config.slug}/team/${teamBRef.id}` : null
+            }
+            dim={finished && match.winner_id !== teamBRef?.id}
+          />
         </div>
         {streams.length > 0 && !finished && (
           <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -236,39 +274,41 @@ export default async function MatchPage({ params }: Props) {
         </section>
       )}
 
-      <section className="grid grid-cols-2 gap-3">
-        {[
-          { team: teamARef, form: formA },
-          { team: teamBRef, form: formB },
-        ].map((x, i) => (
-          <div
-            key={i}
-            className="rounded-xl border border-border-subtle bg-surface px-4 py-3"
-          >
-            <p className="mb-2 truncate text-xs font-semibold text-muted">
-              {x.team?.name ?? "TBD"} — Recent form
-            </p>
-            {x.form.length === 0 ? (
-              <p className="text-xs text-muted">No recent matches</p>
-            ) : (
-              <div className="flex gap-1">
-                {x.form.map((r, j) => (
-                  <span
-                    key={j}
-                    className={`flex h-6 w-6 items-center justify-center rounded text-[11px] font-bold ${
-                      r === "W"
-                        ? "bg-emerald-500/15 text-emerald-400"
-                        : "bg-live/15 text-live"
-                    }`}
-                  >
-                    {r}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </section>
+      {!isStartgg && (
+        <section className="grid grid-cols-2 gap-3">
+          {[
+            { team: teamARef, form: formA },
+            { team: teamBRef, form: formB },
+          ].map((x, i) => (
+            <div
+              key={i}
+              className="rounded-xl border border-border-subtle bg-surface px-4 py-3"
+            >
+              <p className="mb-2 truncate text-xs font-semibold text-muted">
+                {x.team?.name ?? "TBD"} — Recent form
+              </p>
+              {x.form.length === 0 ? (
+                <p className="text-xs text-muted">No recent matches</p>
+              ) : (
+                <div className="flex gap-1">
+                  {x.form.map((r, j) => (
+                    <span
+                      key={j}
+                      className={`flex h-6 w-6 items-center justify-center rounded text-[11px] font-bold ${
+                        r === "W"
+                          ? "bg-emerald-500/15 text-emerald-400"
+                          : "bg-live/15 text-live"
+                      }`}
+                    >
+                      {r}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
 
       {h2h.length > 0 && (
         <section>
