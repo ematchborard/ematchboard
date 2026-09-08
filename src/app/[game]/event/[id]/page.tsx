@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ? await getStartggSerie(Number(id))
       : await getSerie(Number(id));
   const title = serie
-    ? `${serie.league.name} ${serie.full_name ?? ""}`.trim()
+    ? `${serie.league?.name ?? ""} ${serie.full_name ?? ""}`.trim()
     : "Event";
   return { title: `${title} — eMATCH BOARD` };
 }
@@ -57,7 +57,7 @@ export default async function EventPage({ params }: Props) {
         ]);
   if (!serie) notFound();
 
-  const title = `${serie.league.name} ${serie.full_name ?? ""}`.trim();
+  const title = `${serie.league?.name ?? ""} ${serie.full_name ?? ""}`.trim();
   const dateFormat = new Intl.DateTimeFormat("en", {
     month: "short",
     day: "numeric",
@@ -85,7 +85,7 @@ export default async function EventPage({ params }: Props) {
     startDate: serie.begin_at ?? undefined,
     endDate: serie.end_at ?? undefined,
     eventStatus: "https://schema.org/EventScheduled",
-    organizer: { "@type": "Organization", name: serie.league.name },
+    organizer: { "@type": "Organization", name: serie.league?.name ?? config.name },
     url: `https://ematchboard.com/${config.slug}/event/${serie.id}`,
   };
 
@@ -103,7 +103,7 @@ export default async function EventPage({ params }: Props) {
       </Link>
 
       <header className="flex items-center gap-4 rounded-xl border border-border-subtle bg-surface px-4 py-4">
-        {serie.league.image_url ? (
+        {serie.league?.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element -- 外部CDNのリーグロゴ
           <img
             src={serie.league.image_url}

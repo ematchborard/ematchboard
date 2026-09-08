@@ -42,7 +42,7 @@ export default function MonthSummaryList({
 
   const summaryMap = new Map<string, TournamentSummary>();
   for (const m of matches) {
-    if (!m.begin_at) continue;
+    if (!m.begin_at || !m.league || !m.serie) continue;
     const t = Date.parse(m.begin_at);
     if (t < rangeStart || t >= rangeEnd) continue;
     const key = `${m.league.id}:${m.serie.id}`;
@@ -54,7 +54,7 @@ export default function MonthSummaryList({
         serieId: m.serie.id,
         label: eventName,
         image: m.league.image_url,
-        priority: leaguePriority(gameSlug, eventName, m.tournament.tier, lang),
+        priority: leaguePriority(gameSlug, eventName, m.tournament?.tier, lang),
         first: t,
         last: t,
         count: 0,

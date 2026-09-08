@@ -17,6 +17,7 @@ export const EWC_INFO_URL = "https://liquipedia.net/esports/Esports_World_Cup/20
 const EWC_PATTERN = /\bewc\b|esports world cup/i;
 
 export function isEwcMatch(match: Match): boolean {
+  if (!match.league || !match.serie) return false;
   const name = `${match.league.name} ${match.serie.full_name ?? ""}`;
   return EWC_PATTERN.test(name);
 }

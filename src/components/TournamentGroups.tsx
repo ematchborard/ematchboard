@@ -26,6 +26,7 @@ export function groupByTournament(
 ): Group[] {
   const groupMap = new Map<string, Group>();
   for (const m of matches) {
+    if (!m.league || !m.serie) continue;
     const key = `${m.league.id}:${m.serie.id}`;
     let group = groupMap.get(key);
     if (!group) {
@@ -35,7 +36,7 @@ export function groupByTournament(
         serieId: m.serie.id,
         label: eventName,
         image: m.league.image_url,
-        priority: leaguePriority(gameSlug, eventName, m.tournament.tier, lang),
+        priority: leaguePriority(gameSlug, eventName, m.tournament?.tier, lang),
         matches: [],
       };
       groupMap.set(key, group);

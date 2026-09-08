@@ -11,7 +11,10 @@ export function topEventNames(
 ): string[] {
   const seen = new Map<string, number>();
   for (const m of matches) {
-    const name = `${m.league.name} ${m.serie.full_name ?? ""}`.trim();
+    // PandaScoreがまれにleague/tournamentを欠いた試合データを返すことがあるため、
+    // 月表示など件数が多いビューで丸ごと落ちないようスキップする
+    if (!m.league || !m.tournament) continue;
+    const name = `${m.league.name} ${m.serie?.full_name ?? ""}`.trim();
     if (name && !seen.has(name)) {
       seen.set(name, leaguePriority(gameSlug, name, m.tournament.tier));
     }

@@ -130,7 +130,9 @@ export default async function MatchPage({ params }: Props) {
   const scoreB = scoreOf(teamBRef);
   const running = match.status === "running";
   const finished = match.status === "finished";
-  const eventName = `${match.league.name} ${match.serie.full_name ?? ""}`.trim();
+  // PandaScoreがまれにleague/serie/tournamentを欠いた試合データを返すことがあるため、
+  // 値が無くても落ちないようフォールバックする
+  const eventName = `${match.league?.name ?? ""} ${match.serie?.full_name ?? ""}`.trim();
 
   const h2h =
     teamARef && teamBRef
@@ -178,16 +180,20 @@ export default async function MatchPage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }}
       />
-      <Link
-        href={`/${config.slug}/event/${match.serie.id}`}
-        className="text-xs text-muted hover:text-foreground"
-      >
-        ‹ {eventName}
-      </Link>
+      {match.serie ? (
+        <Link
+          href={`/${config.slug}/event/${match.serie.id}`}
+          className="text-xs text-muted hover:text-foreground"
+        >
+          ‹ {eventName}
+        </Link>
+      ) : (
+        <span className="text-xs text-muted">‹ {eventName}</span>
+      )}
 
       <header className="rounded-xl border border-border-subtle bg-surface px-4 py-4">
         <p className="mb-3 text-center text-xs text-muted">
-          {eventName} · {match.tournament.name} · BO{match.number_of_games}
+          {eventName} · {match.tournament?.name ?? ""} · BO{match.number_of_games}
         </p>
         <div className="flex items-center justify-between gap-2">
           <TeamHeader

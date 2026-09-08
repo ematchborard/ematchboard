@@ -17,8 +17,12 @@ interface Props {
   params: Promise<{ game: string; id: string }>;
 }
 
-function tournamentTitle(leagueName: string, serieFullName: string | null, stageName: string) {
-  const event = `${leagueName} ${serieFullName ?? ""}`.trim();
+function tournamentTitle(
+  leagueName: string | undefined,
+  serieFullName: string | null | undefined,
+  stageName: string
+) {
+  const event = `${leagueName ?? ""} ${serieFullName ?? ""}`.trim();
   return `${event} · ${stageName}`;
 }
 
@@ -27,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const tournament = await getTournament(Number(id));
   return {
     title: tournament
-      ? `${tournamentTitle(tournament.league.name, tournament.serie.full_name, tournament.name)} — eMATCH BOARD`
+      ? `${tournamentTitle(tournament.league?.name, tournament.serie?.full_name, tournament.name)} — eMATCH BOARD`
       : "Tournament — eMATCH BOARD",
   };
 }
@@ -78,11 +82,11 @@ export default async function TournamentPage({ params }: Props) {
         className="text-xs text-muted hover:text-foreground"
       >
         ‹{" "}
-        {`${tournament.league.name} ${tournament.serie.full_name ?? ""}`.trim()}
+        {`${tournament.league?.name ?? ""} ${tournament.serie?.full_name ?? ""}`.trim()}
       </Link>
 
       <header className="flex items-center gap-4 rounded-xl border border-border-subtle bg-surface px-4 py-4">
-        {tournament.league.image_url ? (
+        {tournament.league?.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element -- 外部CDNのリーグロゴ
           <img
             src={tournament.league.image_url}
@@ -99,7 +103,7 @@ export default async function TournamentPage({ params }: Props) {
         )}
         <div className="min-w-0">
           <h1 className="truncate text-lg font-bold">
-            {tournamentTitle(tournament.league.name, tournament.serie.full_name, tournament.name)}
+            {tournamentTitle(tournament.league?.name, tournament.serie?.full_name, tournament.name)}
           </h1>
           <p className="text-xs text-muted">
             {config.name}

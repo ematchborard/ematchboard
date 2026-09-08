@@ -43,7 +43,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   );
 
   for (const { g, matches } of perGame) {
-    const serieIds = [...new Set(matches.map((m) => m.serie.id))];
+    // PandaScoreがまれにserieを欠いた試合データを返すことがあるため、
+    // 1件のせいでサイトマップ全体が壊れないようスキップする
+    const serieIds = [
+      ...new Set(matches.filter((m) => m.serie).map((m) => m.serie.id)),
+    ];
     for (const id of serieIds) {
       entries.push({
         url: `${BASE}/${g.slug}/event/${id}`,

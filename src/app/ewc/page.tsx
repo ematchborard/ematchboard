@@ -128,7 +128,7 @@ async function EwcMatchData() {
   return (
     <div className="flex flex-col gap-6">
       {sections.map(({ game, matches, events }) => {
-        const serieId = matches[0]?.serie.id;
+        const serieId = matches[0]?.serie?.id;
         const shown = matches.slice(0, 15);
         return (
           <section key={game.slug}>
