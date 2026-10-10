@@ -11,7 +11,17 @@
   },
   "observability": {
     "enabled": true
-  }
+  },
+  // 試合データの拠点間共有キャッシュ(caches.defaultは拠点ごとに別物で
+  // グローバル共有ではなかったため、2026-10-11にKVへ移行)。
+  // Cloudflareダッシュボード → Storage & Databases → KV で
+  // 新規Namespaceを作成し、そのIDを id に設定すること
+  "kv_namespaces": [
+    {
+      "binding": "MATCH_CACHE",
+      "id": "1ab87e397f9b483189206a68fc2d21cf"
+    }
+  ]
   // PANDASCORE_TOKEN は絶対にここに書かない。デプロイ後に
   //   npx wrangler secret put PANDASCORE_TOKEN
   // で登録する(ローカルプレビュー用は .dev.vars に書く)

@@ -1,3 +1,5 @@
+/// <reference types="@cloudflare/workers-types" />
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type {
   BracketMatch,
   Match,
@@ -31,15 +33,25 @@ export function hasApiToken(): boolean {
 
 // 3層キャッシュ戦略(無料枠1,000req/時を守る生命線):
 //  1. プロセス内メモリ(5分) — 同一インスタンス内の連続アクセス用
-//  2. Cloudflareエッジキャッシュ(5分) — Workers全インスタンス共有。
-//     WorkersではNextのfetchキャッシュ(revalidate)が永続化されないため必須
+//  2. Cloudflare KV(5分) — 拠点をまたいで共有される(KVの由来)。
+//     以前はcaches.default(Cache API)を使っていたが、これは**拠点ごとに別物**で
+//     グローバル共有ではないため、アクセスの少ない拠点(海外等)は毎回キャッシュが
+//     空の状態から上流に生アクセスし、そこで失敗すると救えず空表示になっていた
+//     (2026-10-11、海外アクセスで試合0件になる不具合として発覚)。KVは拠点間で
+//     数十秒程度のラグはあるが共有されるため、この問題を構造的に解消する。
 //  3. 上流が429等で失敗したら、期限切れのメモリキャッシュでも返す(空表示より古いデータ)
 const memCache = new Map<string, { expires: number; data: unknown }>();
 const MEM_TTL_MS = 5 * 60_000;
+const KV_TTL_SEC = 300;
 
-function edgeCache(): Cache | undefined {
-  return (globalThis as { caches?: CacheStorage & { default?: Cache } }).caches
-    ?.default;
+async function kvCache(): Promise<KVNamespace | undefined> {
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    return (env as { MATCH_CACHE?: KVNamespace }).MATCH_CACHE;
+  } catch {
+    // ローカル開発(next dev)等、Cloudflareコンテキストが無い環境では無視
+    return undefined;
+  }
 }
 
 async function psFetch<T>(
@@ -52,18 +64,17 @@ async function psFetch<T>(
   const hit = memCache.get(url);
   if (hit && hit.expires > Date.now()) return hit.data as T;
 
-  // エッジキャッシュ(URLのみがキーで、トークンは含まれないので安全)
-  const cache = edgeCache();
-  if (cache) {
+  // KVキャッシュ(URLのみがキーで、トークンは含まれないので安全)
+  const kv = await kvCache();
+  if (kv) {
     try {
-      const cached = await cache.match(url);
-      if (cached) {
-        const data = (await cached.json()) as T;
-        memCache.set(url, { expires: Date.now() + MEM_TTL_MS, data });
-        return data;
+      const cached = await kv.get<T>(url, "json");
+      if (cached !== null) {
+        memCache.set(url, { expires: Date.now() + MEM_TTL_MS, data: cached });
+        return cached;
       }
     } catch {
-      // エッジキャッシュの失敗は無視して上流へ
+      // KV読み取り失敗は無視して上流へ
     }
   }
 
@@ -93,17 +104,11 @@ async function psFetch<T>(
       if (v.expires < Date.now()) memCache.delete(k);
     }
   }
-  if (cache) {
+  if (kv) {
     try {
-      await cache.put(
-        url,
-        new Response(JSON.stringify(data), {
-          headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "public, max-age=300, s-maxage=300",
-          },
-        })
-      );
+      await kv.put(url, JSON.stringify(data), {
+        expirationTtl: KV_TTL_SEC,
+      });
     } catch {
       // キャッシュ保存失敗は無視(次回また上流から取る)
     }
@@ -124,15 +129,26 @@ export async function getMatches(
       return t >= fromMs && t <= toMs;
     });
   }
-  // 月表示など期間が長いと100件を超えるのでページを追う(最大5ページ=500件)
+  // 月表示など期間が長いと100件を超えるのでページを追う(最大5ページ=500件)。
+  // 1ページでも失敗したら、それまでに集めた分だけ返す(例外を外に投げない)。
+  // caches.defaultはCloudflareの拠点ごとに別物なので、まだ温まってない拠点
+  // (海外からのアクセス等)ではキャッシュに頼れず上流への生アクセスが起きやすく、
+  // そこで失敗すると呼び出し元が軒並み「空=試合無し」と誤認してしまうため、
+  // ここで失敗を記録しておく(Cloudflareの Observability > Logs で追える)。
   const all: Match[] = [];
   for (let page = 1; page <= 5; page++) {
-    const batch = await psFetch<Match[]>(`/${gameSlug}/matches`, {
-      "range[begin_at]": `${from.toISOString()},${to.toISOString()}`,
-      sort: "begin_at",
-      per_page: "100",
-      page: String(page),
-    });
+    let batch: Match[];
+    try {
+      batch = await psFetch<Match[]>(`/${gameSlug}/matches`, {
+        "range[begin_at]": `${from.toISOString()},${to.toISOString()}`,
+        sort: "begin_at",
+        per_page: "100",
+        page: String(page),
+      });
+    } catch (err) {
+      console.error(`getMatches(${gameSlug}) page ${page} failed:`, err);
+      break;
+    }
     all.push(...batch);
     if (batch.length < 100) break;
   }

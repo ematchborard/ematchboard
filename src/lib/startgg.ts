@@ -1,3 +1,5 @@
+/// <reference types="@cloudflare/workers-types" />
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type {
   Match,
   MatchDetail,
@@ -80,35 +82,59 @@ function stableId(label: string): number {
 }
 
 // 3層キャッシュ戦略(PandaScoreと同じ設計。start.ggのレート制限は
-// 80req/60秒とPandaScoreよりタイトなので、キャッシュの意義がより大きい)
+// 80req/60秒とPandaScoreよりタイトなので、キャッシュの意義がより大きい)。
+// エッジキャッシュはCloudflare KVを使う(拠点をまたいで共有されるため。
+// 以前はcaches.defaultだったが拠点ごとに別物でグローバル共有ではなく、
+// 海外アクセスでキャッシュが温まってない拠点が上流失敗を即座に空表示に
+// してしまう不具合があった。詳細はpandascore.tsのコメント参照)
 const memCache = new Map<string, { expires: number; data: unknown }>();
 const MEM_TTL_MS = 5 * 60_000;
+const KV_TTL_SEC = 300;
 
-function edgeCache(): Cache | undefined {
-  return (globalThis as { caches?: CacheStorage & { default?: Cache } }).caches
-    ?.default;
+async function kvCache(): Promise<KVNamespace | undefined> {
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    return (env as { MATCH_CACHE?: KVNamespace }).MATCH_CACHE;
+  } catch {
+    return undefined;
+  }
+}
+
+// KVのキー長上限(512バイト)に収まるよう、クエリ+変数をハッシュ化する
+// (生のGraphQLクエリ文をそのままキーにすると長いものが上限を超えるため)
+function hashKey(s: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
 }
 
 async function sgQuery<T>(
   query: string,
   variables: Record<string, unknown>,
 ): Promise<T | null> {
-  const cacheKey = `${API_URL}?v=${encodeURIComponent(JSON.stringify(variables))}&q=${encodeURIComponent(query.replace(/\s+/g, " ").trim())}`;
+  const rawKey = `${JSON.stringify(variables)}::${query.replace(/\s+/g, " ").trim()}`;
+  const cacheKey = `sg:${hashKey(rawKey)}`;
 
   const hit = memCache.get(cacheKey);
   if (hit && hit.expires > Date.now()) return hit.data as T;
 
-  const cache = edgeCache();
-  if (cache) {
+  const kv = await kvCache();
+  if (kv) {
     try {
-      const cached = await cache.match(cacheKey);
-      if (cached) {
-        const data = (await cached.json()) as T;
-        memCache.set(cacheKey, { expires: Date.now() + MEM_TTL_MS, data });
-        return data;
+      const cached = await kv.get<T>(cacheKey, "json");
+      if (cached !== null) {
+        memCache.set(cacheKey, { expires: Date.now() + MEM_TTL_MS, data: cached });
+        return cached;
       }
     } catch {
-      // エッジキャッシュの失敗は無視して上流へ
+      // KV読み取り失敗は無視して上流へ
     }
   }
 
@@ -143,17 +169,11 @@ async function sgQuery<T>(
       if (v.expires < Date.now()) memCache.delete(k);
     }
   }
-  if (cache) {
+  if (kv) {
     try {
-      await cache.put(
-        cacheKey,
-        new Response(JSON.stringify(data), {
-          headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "public, max-age=300, s-maxage=300",
-          },
-        }),
-      );
+      await kv.put(cacheKey, JSON.stringify(data), {
+        expirationTtl: KV_TTL_SEC,
+      });
     } catch {
       // キャッシュ保存失敗は無視
     }
