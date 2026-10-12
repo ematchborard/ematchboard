@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
+import { getRunningSeries } from "@/lib/featured";
 import GameSidebar from "@/components/GameSidebar";
 import GameTabs from "@/components/GameTabs";
 import LanguageSelect from "@/components/LanguageSelect";
@@ -34,11 +35,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // 開催中(tier s/a)の大会一覧。サイドバー/モバイルタブで共有するため
+  // layout側で1回だけ取得する(pandascore.ts側のキャッシュが効くので軽い)
+  const runningSeries = await getRunningSeries().catch(() => []);
+
   return (
     <html
       lang="en"
@@ -65,13 +70,13 @@ export default function RootLayout({
             </div>
             {/* スマホ幅ではサイドバーの代わりにタブでゲーム切替 */}
             <div className="md:hidden">
-              <GameTabs />
+              <GameTabs runningSeries={runningSeries} />
             </div>
           </div>
         </header>
         <div className="mx-auto flex w-full max-w-5xl flex-1 items-start gap-6 px-4 py-6">
           <aside className="hidden w-56 shrink-0 md:block">
-            <GameSidebar />
+            <GameSidebar runningSeries={runningSeries} />
           </aside>
           <main className="min-w-0 max-w-2xl flex-1">{children}</main>
         </div>

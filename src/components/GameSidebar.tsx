@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useFollowedGames, useFollowedTeams } from "@/lib/follow";
 import type { GameCategory, GameConfig } from "@/lib/games";
+import type { RunningSerie } from "@/lib/featured";
 
 // デスクトップ用の左サイドバー。FotMobの「トップリーグ / すべてのリーグ」に
 // 倣い、セクションごとに独立したカードで区切る: 移動 → フォロー中 → 人気ゲーム
@@ -102,7 +103,35 @@ function CardLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function GameSidebar() {
+function RunningSerieRow({ serie }: { serie: RunningSerie }) {
+  return (
+    <Link
+      href={serie.url}
+      className="flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors hover:bg-surface-hover"
+    >
+      <span
+        className="h-2 w-2 shrink-0 rounded-full"
+        style={{ backgroundColor: serie.accent }}
+        aria-hidden
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-semibold">
+          {serie.leagueName} {serie.serieName}
+        </p>
+        <p className="truncate text-[11px] text-muted">
+          {serie.gameName && `${serie.gameName} · `}
+          {serie.stageName}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+export default function GameSidebar({
+  runningSeries = [],
+}: {
+  runningSeries?: RunningSerie[];
+}) {
   const pathname = usePathname();
   const { ready, followed, others, toggleFollow, showOthers, setShowOthers } =
     useFollowedGames();
@@ -167,6 +196,15 @@ export default function GameSidebar() {
           Esports World Cup
         </Link>
       </Card>
+
+      {runningSeries.length > 0 && (
+        <Card>
+          <CardLabel>開催中の大会</CardLabel>
+          {runningSeries.map((s) => (
+            <RunningSerieRow key={s.key} serie={s} />
+          ))}
+        </Card>
+      )}
 
       <Card>
         <CardLabel>Following</CardLabel>

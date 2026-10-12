@@ -2,12 +2,14 @@ import { Suspense } from "react";
 import { GAMES } from "@/lib/games";
 import { getMatches, hasApiToken } from "@/lib/pandascore";
 import { getStartggMatches, type StartggGameSlug } from "@/lib/startgg";
+import { getBigMatchesToday } from "@/lib/featured";
 import {
   parseDateParam,
   parseOffset,
   parseViewMode,
   rangeFor,
 } from "@/lib/range";
+import BigMatchGrid, { type BigMatchItem } from "@/components/BigMatchGrid";
 import HomeOverview from "@/components/HomeOverview";
 import ViewTabs from "@/components/ViewTabs";
 
@@ -54,6 +56,17 @@ async function HomeMatchData({
   );
 }
 
+async function BigMatchSection() {
+  const big = await getBigMatchesToday();
+  const items: BigMatchItem[] = big.map(({ match, game }) => ({
+    match,
+    gameSlug: game.slug,
+    gameName: game.name,
+    accent: game.accent,
+  }));
+  return <BigMatchGrid items={items} />;
+}
+
 function HomeSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-3">
@@ -72,6 +85,9 @@ export default async function Home({ searchParams }: Props) {
 
   return (
     <div>
+      <Suspense fallback={null}>
+        <BigMatchSection />
+      </Suspense>
       {/* 検索エンジン向けのサーバー描画テキスト。データ取得を待たず即座に送信される */}
       <div className="mb-3">
         <h1 className="text-lg font-bold">Esports Schedules & Results</h1>

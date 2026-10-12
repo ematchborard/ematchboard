@@ -13,6 +13,7 @@ export interface Team {
   name: string;
   acronym: string | null;
   image_url: string | null;
+  location?: string | null; // 国コード(例: "JP")。入っていないレスポンスもある
 }
 
 export interface Player {
@@ -38,6 +39,11 @@ export interface Tournament {
   end_at: string | null;
   league: { id: number; name: string; image_url: string | null };
   serie: { id: number; full_name: string | null };
+  has_bracket?: boolean;
+  prizepool?: string | null;
+  country?: string | null; // ISOの国コード(無ければregionで代用)
+  region?: string | null;
+  teams?: Team[]; // ロスター無しの基本情報のみ(location=国コードでJP判定に使える)
 }
 
 // シリーズ = 大会の1開催全体 (例: "EWC 2026"、"LEC Summer 2026")。

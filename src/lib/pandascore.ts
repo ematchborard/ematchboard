@@ -164,6 +164,25 @@ export async function getTournament(id: number): Promise<Tournament | null> {
   }
 }
 
+// ゲームをまたいで開催中(tier s/a)の大会を横断取得(ホームのビッグマッチ/
+// サイドバーの「開催中の大会」用)。PandaScoreの/tournaments/runningは
+// 全タイトル共通のエンドポイント(ゲームごとに叩く必要がない)
+export interface RunningTournament extends Tournament {
+  videogame: { id: number; name: string; slug: string };
+}
+
+export async function getRunningTournaments(): Promise<RunningTournament[]> {
+  if (!hasApiToken()) return [];
+  try {
+    return await psFetch<RunningTournament[]>("/tournaments/running", {
+      "filter[tier]": "s,a",
+      per_page: "50",
+    });
+  } catch {
+    return [];
+  }
+}
+
 export async function getTournamentMatches(id: number): Promise<Match[]> {
   if (!hasApiToken()) return mockTournamentMatches(id);
   try {
