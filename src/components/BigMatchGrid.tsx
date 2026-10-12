@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { Match } from "@/lib/types";
+import type { Match, Team } from "@/lib/types";
 
 // ホーム最上部「今日のビッグマッチ」のカードグリッド。
 // 時刻は閲覧者のタイムゾーンで出したいのでクライアント側で処理
@@ -12,6 +12,9 @@ export interface BigMatchItem {
   match: Match;
   gameSlug: string;
   gameName: string;
+  gameShort: string;
+  gameLogo: string | null;
+  gameLogoFixedColor?: boolean;
   accent: string;
 }
 
@@ -27,6 +30,41 @@ function MatchTime({ iso }: { iso: string }) {
         hour12: false,
       }).format(new Date(iso))}
     </>
+  );
+}
+
+function GameIcon({ item }: { item: BigMatchItem }) {
+  if (item.gameLogo) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- 自前ホストのロゴ画像(public/game-logos)
+      <img
+        src={item.gameLogo}
+        alt=""
+        className={`h-5 w-5 shrink-0 object-contain ${item.gameLogoFixedColor ? "" : "game-logo-auto"}`}
+      />
+    );
+  }
+  return (
+    <span
+      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[8px] font-bold"
+      style={{ backgroundColor: `${item.accent}22`, color: item.accent }}
+    >
+      {item.gameShort}
+    </span>
+  );
+}
+
+function TeamLogo({ team }: { team: Team | null }) {
+  if (team?.image_url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- 外部CDNのチームロゴ
+      <img src={team.image_url} alt="" className="h-9 w-9 shrink-0 object-contain" />
+    );
+  }
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-hover text-[10px] font-bold text-muted">
+      {team ? (team.acronym ?? team.name).slice(0, 2).toUpperCase() : "?"}
+    </span>
   );
 }
 
@@ -52,9 +90,15 @@ function Card({ item }: { item: BigMatchItem }) {
         style={{ backgroundColor: accent }}
         aria-hidden
       />
-      <div className="flex items-center justify-between pl-1.5">
-        <span className="truncate text-[11px] font-bold uppercase tracking-wide" style={{ color: accent }}>
-          {gameName}
+      <div className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2.5 pl-1.5">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <GameIcon item={item} />
+          <span
+            className="truncate text-[11px] font-bold uppercase tracking-wide"
+            style={{ color: accent }}
+          >
+            {gameName}
+          </span>
         </span>
         {running ? (
           <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold text-live">
@@ -72,16 +116,22 @@ function Card({ item }: { item: BigMatchItem }) {
       <p className="truncate pl-1.5 text-[11px] text-muted">
         {eventName} · BO{m.number_of_games}
       </p>
-      <div className="flex items-center justify-center gap-2 pl-1.5">
-        <span className="min-w-0 flex-1 truncate text-right text-sm font-semibold">
-          {teamA?.name ?? "TBD"}
-        </span>
+      <div className="flex items-center justify-center gap-3 px-1.5 py-0.5">
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+          <TeamLogo team={teamA} />
+          <span className="max-w-full truncate text-xs font-semibold">
+            {teamA?.name ?? "TBD"}
+          </span>
+        </div>
         <span className="shrink-0 text-sm font-bold tabular-nums text-muted">
-          {scoreA !== null && scoreB !== null ? `${scoreA} – ${scoreB}` : "vs"}
+          {scoreA !== null && scoreB !== null ? `${scoreA} – ${scoreB}` : "VS"}
         </span>
-        <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold">
-          {teamB?.name ?? "TBD"}
-        </span>
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+          <TeamLogo team={teamB} />
+          <span className="max-w-full truncate text-xs font-semibold">
+            {teamB?.name ?? "TBD"}
+          </span>
+        </div>
       </div>
       <span className="pl-1.5 text-[11px] font-semibold text-muted transition-colors group-hover:text-foreground">
         大会を見る ›

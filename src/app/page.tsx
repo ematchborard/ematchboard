@@ -62,6 +62,9 @@ async function BigMatchSection() {
     match,
     gameSlug: game.slug,
     gameName: game.name,
+    gameShort: game.short,
+    gameLogo: game.logo ?? null,
+    gameLogoFixedColor: game.logoFixedColor,
     accent: game.accent,
   }));
   return <BigMatchGrid items={items} />;
