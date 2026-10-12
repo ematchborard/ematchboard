@@ -3,12 +3,12 @@
 import Link from "next/link";
 import type { Match } from "@/lib/types";
 import { useLanguage } from "@/lib/follow";
-import { leaguePriority } from "@/lib/popularity";
+import { leaguePriority, matchesRegion } from "@/lib/popularity";
 import MatchRow from "./MatchCard";
 
 // 試合を大会全体(リーグ×シリーズ)ごとにまとめ、人気大会順に並べて表示する共通部品。
 // Day/Week/ホームから使う。ヘッダーのタップで大会全体ページ(/event/:serieId)へ。
-// 選択言語に近い地域の大会は少し上に押し上げられる。
+// 選択言語に近い地域の大会は上に押し上げたうえで📍バッジを付け、効果が見える形にする。
 
 interface Group {
   key: string;
@@ -16,6 +16,7 @@ interface Group {
   label: string;
   image: string | null;
   priority: number;
+  regional: boolean;
   matches: Match[];
 }
 
@@ -37,6 +38,7 @@ export function groupByTournament(
         label: eventName,
         image: m.league.image_url,
         priority: leaguePriority(gameSlug, eventName, m.tournament?.tier, lang),
+        regional: matchesRegion(eventName, lang),
         matches: [],
       };
       groupMap.set(key, group);
@@ -98,7 +100,15 @@ export default function TournamentGroups({
                 {group.label.slice(0, 2).toUpperCase()}
               </span>
             )}
-            <h2 className="truncate text-sm font-semibold">{group.label}</h2>
+            <h2 className="min-w-0 truncate text-sm font-semibold">{group.label}</h2>
+            {group.regional && (
+              <span
+                className="shrink-0 rounded-full bg-brand/15 px-1.5 py-0.5 text-[10px] font-bold text-brand"
+                title="選択した言語/地域に近い大会"
+              >
+                📍
+              </span>
+            )}
             <span className="ml-auto shrink-0 text-xs text-muted">
               {group.matches.length} ›
             </span>

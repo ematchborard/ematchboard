@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useLanguage } from "@/lib/follow";
-import { leaguePriority } from "@/lib/popularity";
+import { leaguePriority, matchesRegion } from "@/lib/popularity";
 import type { Match } from "@/lib/types";
 
 // 指定期間内の大会全体(シリーズ)単位のサマリー一覧。
@@ -14,6 +14,7 @@ interface TournamentSummary {
   label: string;
   image: string | null;
   priority: number;
+  regional: boolean;
   first: number;
   last: number;
   count: number;
@@ -55,6 +56,7 @@ export default function MonthSummaryList({
         label: eventName,
         image: m.league.image_url,
         priority: leaguePriority(gameSlug, eventName, m.tournament?.tier, lang),
+        regional: matchesRegion(eventName, lang),
         first: t,
         last: t,
         count: 0,
@@ -98,7 +100,17 @@ export default function MonthSummaryList({
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{s.label}</p>
+            <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
+              <span className="truncate">{s.label}</span>
+              {s.regional && (
+                <span
+                  className="shrink-0 rounded-full bg-brand/15 px-1.5 py-0.5 text-[10px] font-bold text-brand"
+                  title="選択した言語/地域に近い大会"
+                >
+                  📍
+                </span>
+              )}
+            </p>
             <p className="text-xs text-muted">
               {dateFormat.format(s.first)}
               {s.first !== s.last && ` – ${dateFormat.format(s.last)}`}

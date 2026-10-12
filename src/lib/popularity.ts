@@ -71,8 +71,20 @@ const REGION_KEYWORDS: Record<string, string[]> = {
   de: ["germany", "prime league", "german"],
 };
 
+// 選択言語に対応する地域の大会かどうか(リーグ名+シリーズ名に地域キーワードが
+// 含まれるか)。並び順の補正だけでなく、UI側の目印表示にも使う
+export function matchesRegion(leagueAndSerieName: string, lang?: string): boolean {
+  if (!lang) return false;
+  const words = REGION_KEYWORDS[lang];
+  if (!words || words.length === 0) return false;
+  const name = leagueAndSerieName.toLowerCase();
+  return words.some((k) => name.includes(k));
+}
+
 // 小さいほど人気(上に表示)。キーワード不一致は最下位グループ扱い。
-// lang を渡すと、その言語の地域大会が同格の大会より少し上に来る。
+// lang を渡すと、その地域の大会はキーワード順位を4割に圧縮して大きく押し上げる
+// (固定値の減算だとゲームごとにキーワード数が違いスケールが合わないため、
+// 倍率で縮める方式にしてどのゲームでも体感できる差にしている)
 export function leaguePriority(
   gameSlug: string,
   leagueAndSerieName: string,
@@ -84,7 +96,7 @@ export function leaguePriority(
   const kwIndex = keywords.findIndex((k) => name.includes(k));
   const kwScore = kwIndex === -1 ? keywords.length : kwIndex;
   const tierScore = tier ? (TIER_RANK[tier.toLowerCase()] ?? 5) : 5;
-  const regionWords = lang ? (REGION_KEYWORDS[lang] ?? []) : [];
-  const regionBoost = regionWords.some((k) => name.includes(k)) ? 4 : 0;
-  return kwScore * 10 + tierScore - regionBoost;
+  const regional = matchesRegion(leagueAndSerieName, lang);
+  const adjustedKwScore = regional ? kwScore * 0.4 : kwScore;
+  return adjustedKwScore * 10 + tierScore;
 }
