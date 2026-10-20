@@ -104,16 +104,22 @@ function CardLabel({ children }: { children: React.ReactNode }) {
 }
 
 function RunningSerieRow({ serie }: { serie: RunningSerie }) {
+  const image = serie.leagueImage ?? serie.gameLogo;
   return (
     <Link
       href={serie.url}
       className="flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors hover:bg-surface-hover"
     >
-      <span
-        className="h-2 w-2 shrink-0 rounded-full"
-        style={{ backgroundColor: serie.accent }}
-        aria-hidden
-      />
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element -- 外部CDNのリーグ/ゲームロゴ
+        <img src={image} alt="" className="h-5 w-5 shrink-0 object-contain" />
+      ) : (
+        <span
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{ backgroundColor: serie.accent }}
+          aria-hidden
+        />
+      )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-semibold">
           {serie.leagueName} {serie.serieName}

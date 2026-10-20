@@ -126,6 +126,94 @@ function ScheduleRow({ match }: { match: Match }) {
   );
 }
 
+function PlayInSection({ matches }: { matches: Match[] }) {
+  if (matches.length === 0) return null;
+  return (
+    <section
+      key="play-in"
+      className="overflow-hidden rounded-xl border border-border-subtle bg-surface"
+    >
+      <h2 className="border-b border-border-subtle bg-surface-hover/50 px-4 py-2.5 text-sm font-semibold">
+        予選(Play-In)結果
+      </h2>
+      <div className="divide-y divide-border-subtle">
+        {matches.map((m) => (
+          <ScheduleRow key={m.id} match={m} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function GroupStageSection({ matches }: { matches: Match[] }) {
+  const byDay = new Map<string, Match[]>();
+  for (const m of matches) {
+    if (!m.begin_at) continue;
+    const key = jstDayKey(m.begin_at);
+    const list = byDay.get(key) ?? [];
+    list.push(m);
+    byDay.set(key, list);
+  }
+  const days = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+  return (
+    <section key="group-stage">
+      <h2 className="mb-2 text-sm font-semibold">グループステージ 日程(日本時間)</h2>
+      {days.length === 0 ? (
+        <p className="rounded-xl border border-border-subtle bg-surface px-4 py-10 text-center text-sm text-muted">
+          日程は近日公開予定です
+        </p>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {days.map(([key, dayMatches]) => (
+            <div key={key}>
+              <h3 className="mb-2 text-sm font-semibold">
+                {jstDayLabel(dayMatches[0].begin_at as string)}
+              </h3>
+              <div className="divide-y divide-border-subtle overflow-hidden rounded-xl border border-border-subtle bg-surface">
+                {dayMatches
+                  .slice()
+                  .sort(
+                    (a, b) =>
+                      (a.begin_at ? Date.parse(a.begin_at) : 0) -
+                      (b.begin_at ? Date.parse(b.begin_at) : 0)
+                  )
+                  .map((m) => (
+                    <ScheduleRow key={m.id} match={m} />
+                  ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PlayoffsSection({ matches }: { matches: Match[] }) {
+  if (matches.length === 0) return null;
+  return (
+    <section
+      key="playoffs"
+      className="overflow-hidden rounded-xl border border-border-subtle bg-surface"
+    >
+      <h2 className="border-b border-border-subtle bg-surface-hover/50 px-4 py-2.5 text-sm font-semibold">
+        プレーオフ 主要日程(日本時間)
+      </h2>
+      <div className="divide-y divide-border-subtle">
+        {matches.map((m) => (
+          <div key={m.id} className="flex items-center justify-between px-4 py-2.5">
+            <span className="text-sm font-medium">{roundOf(m) ?? m.name}</span>
+            <span className="shrink-0 text-xs text-muted">
+              {m.begin_at ? `${jstDayLabel(m.begin_at)} ${jstTime(m.begin_at)}〜` : "TBD"}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default async function WorldsPage() {
   const config = getGame(GAME_SLUG)!;
   const [serie, stages, matches] = await Promise.all([
@@ -153,17 +241,38 @@ export default async function WorldsPage() {
     .filter((m) => m.tournament.id === playoffs?.id)
     .sort((a, b) => (a.begin_at ? Date.parse(a.begin_at) : 0) - (b.begin_at ? Date.parse(b.begin_at) : 0));
 
-  const byDay = new Map<string, Match[]>();
-  for (const m of groupMatches) {
-    if (!m.begin_at) continue;
-    const key = jstDayKey(m.begin_at);
-    const list = byDay.get(key) ?? [];
-    list.push(m);
-    byDay.set(key, list);
-  }
-  const days = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-
   const teams = groupStage?.teams ?? [];
+
+  // 「現在のステージ」= 開始日を過ぎている中で一番遅いもの(どのステージも
+  // 未開始ならPlay-In=先頭)。これを一番上に出し、StageTabsの選択状態も合わせる。
+  // 例: 今はPlay-In → Play-Inが先頭。Group Stage開始後はGroup Stageが先頭に切り替わる
+  const now = new Date().getTime();
+  let currentStage = sortedStages[0];
+  for (const s of sortedStages) {
+    if (s.begin_at && Date.parse(s.begin_at) <= now) currentStage = s;
+  }
+
+  const sectionByStageId = new Map<number, React.ReactNode>();
+  if (playIn)
+    sectionByStageId.set(playIn.id, <PlayInSection key="play-in" matches={playInMatches} />);
+  if (groupStage)
+    sectionByStageId.set(
+      groupStage.id,
+      <GroupStageSection key="group-stage" matches={groupMatches} />
+    );
+  if (playoffs)
+    sectionByStageId.set(
+      playoffs.id,
+      <PlayoffsSection key="playoffs" matches={playoffMatches} />
+    );
+  const orderedSections = currentStage
+    ? [
+        currentStage.id,
+        ...sortedStages.filter((s) => s.id !== currentStage.id).map((s) => s.id),
+      ]
+        .map((id) => sectionByStageId.get(id))
+        .filter(Boolean)
+    : [...sectionByStageId.values()];
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -223,72 +332,11 @@ export default async function WorldsPage() {
           gameSlug={config.slug}
           serieId={WORLDS_SERIE_ID}
           stages={sortedStages.map((s) => ({ id: s.id, name: s.name }))}
+          activeTournamentId={currentStage?.id}
         />
       )}
 
-      {playInMatches.length > 0 && (
-        <section className="overflow-hidden rounded-xl border border-border-subtle bg-surface">
-          <h2 className="border-b border-border-subtle bg-surface-hover/50 px-4 py-2.5 text-sm font-semibold">
-            予選(Play-In)結果
-          </h2>
-          <div className="divide-y divide-border-subtle">
-            {playInMatches.map((m) => (
-              <ScheduleRow key={m.id} match={m} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section>
-        <h2 className="mb-2 text-sm font-semibold">グループステージ 日程(日本時間)</h2>
-        {days.length === 0 ? (
-          <p className="rounded-xl border border-border-subtle bg-surface px-4 py-10 text-center text-sm text-muted">
-            日程は近日公開予定です
-          </p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {days.map(([key, dayMatches]) => (
-              <div key={key}>
-                <h3 className="mb-2 text-sm font-semibold">
-                  {jstDayLabel(dayMatches[0].begin_at as string)}
-                </h3>
-                <div className="divide-y divide-border-subtle overflow-hidden rounded-xl border border-border-subtle bg-surface">
-                  {dayMatches
-                    .slice()
-                    .sort(
-                      (a, b) =>
-                        (a.begin_at ? Date.parse(a.begin_at) : 0) -
-                        (b.begin_at ? Date.parse(b.begin_at) : 0)
-                    )
-                    .map((m) => (
-                      <ScheduleRow key={m.id} match={m} />
-                    ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {playoffMatches.length > 0 && (
-        <section className="overflow-hidden rounded-xl border border-border-subtle bg-surface">
-          <h2 className="border-b border-border-subtle bg-surface-hover/50 px-4 py-2.5 text-sm font-semibold">
-            プレーオフ 主要日程(日本時間)
-          </h2>
-          <div className="divide-y divide-border-subtle">
-            {playoffMatches.map((m) => (
-              <div key={m.id} className="flex items-center justify-between px-4 py-2.5">
-                <span className="text-sm font-medium">{roundOf(m) ?? m.name}</span>
-                <span className="shrink-0 text-xs text-muted">
-                  {m.begin_at
-                    ? `${jstDayLabel(m.begin_at)} ${jstTime(m.begin_at)}〜`
-                    : "TBD"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {orderedSections}
 
       {teams.length > 0 && (
         <section>

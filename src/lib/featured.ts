@@ -3,7 +3,12 @@ import { EWC_END, EWC_START } from "./ewc";
 import { getMatches, getRunningTournaments } from "./pandascore";
 import { getStartggMatches, type StartggGameSlug } from "./startgg";
 import type { Match } from "./types";
-import { WORLDS_END, WORLDS_SERIE_ID, WORLDS_START } from "./worlds";
+import {
+  WORLDS_END,
+  WORLDS_LEAGUE_IMAGE,
+  WORLDS_SERIE_ID,
+  WORLDS_START,
+} from "./worlds";
 
 // ホームの「今日のビッグマッチ」枠とサイドバーの「開催中の大会」枠で使う
 // 横断データ層。/api/today(X投稿下書き用)とも「今日」の定義を共有する。
@@ -85,6 +90,9 @@ export interface RunningSerie {
   leagueName: string;
   serieName: string;
   leagueImage: string | null;
+  // leagueImageが無いときのフォールバック(そのゲームのロゴ)。
+  // 複数タイトル横断のEWC等はnullのまま(色ドットにフォールバック)
+  gameLogo: string | null;
   tier: string;
   stageName: string;
   url: string;
@@ -99,6 +107,7 @@ const MANUAL_RUNNING_HIGHLIGHTS: {
   label: string;
   stageName: string;
   url: string;
+  image: string | null;
 }[] = [
   {
     start: EWC_START,
@@ -106,6 +115,7 @@ const MANUAL_RUNNING_HIGHLIGHTS: {
     label: "Esports World Cup",
     stageName: "複数タイトル横断",
     url: "/ewc",
+    image: null,
   },
   {
     start: WORLDS_START,
@@ -113,6 +123,7 @@ const MANUAL_RUNNING_HIGHLIGHTS: {
     label: "Worlds 2026",
     stageName: "日本時間の日程まとめ",
     url: "/worlds",
+    image: WORLDS_LEAGUE_IMAGE,
   },
 ];
 
@@ -126,7 +137,8 @@ export async function getRunningSeries(): Promise<RunningSerie[]> {
     accent: "#f59e0b",
     leagueName: h.label,
     serieName: "",
-    leagueImage: null,
+    leagueImage: h.image,
+    gameLogo: null,
     tier: "s",
     stageName: h.stageName,
     url: h.url,
@@ -159,6 +171,7 @@ export async function getRunningSeries(): Promise<RunningSerie[]> {
         leagueName: t.league.name,
         serieName: t.serie.full_name ?? "",
         leagueImage: t.league.image_url,
+        gameLogo: game.logo ?? null,
         tier: t.tier ?? "",
         stageName: t.name,
         url,
