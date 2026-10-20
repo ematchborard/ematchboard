@@ -30,6 +30,12 @@ export const metadata: Metadata = {
     siteName: "eMATCH BOARD",
     type: "website",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "eMATCH BOARD — Esports Schedules & Results",
+    description:
+      "All esports schedules in one place. VALORANT, LoL, CS2, Dota 2 and more — in your local timezone.",
+  },
   verification: {
     google: "5XCLyjKuD-EoH4Q1N4um_HDpPa5obmnduKGMAzHOiko",
   },

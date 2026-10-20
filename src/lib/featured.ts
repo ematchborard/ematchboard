@@ -3,6 +3,7 @@ import { EWC_END, EWC_START } from "./ewc";
 import { getMatches, getRunningTournaments } from "./pandascore";
 import { getStartggMatches, type StartggGameSlug } from "./startgg";
 import type { Match } from "./types";
+import { WORLDS_END, WORLDS_SERIE_ID, WORLDS_START } from "./worlds";
 
 // ホームの「今日のビッグマッチ」枠とサイドバーの「開催中の大会」枠で使う
 // 横断データ層。/api/today(X投稿下書き用)とも「今日」の定義を共有する。
@@ -96,9 +97,23 @@ const MANUAL_RUNNING_HIGHLIGHTS: {
   start: string;
   end: string;
   label: string;
+  stageName: string;
   url: string;
 }[] = [
-  { start: EWC_START, end: EWC_END, label: "Esports World Cup", url: "/ewc" },
+  {
+    start: EWC_START,
+    end: EWC_END,
+    label: "Esports World Cup",
+    stageName: "複数タイトル横断",
+    url: "/ewc",
+  },
+  {
+    start: WORLDS_START,
+    end: WORLDS_END,
+    label: "Worlds 2026",
+    stageName: "日本時間の日程まとめ",
+    url: "/worlds",
+  },
 ];
 
 export async function getRunningSeries(): Promise<RunningSerie[]> {
@@ -113,9 +128,10 @@ export async function getRunningSeries(): Promise<RunningSerie[]> {
     serieName: "",
     leagueImage: null,
     tier: "s",
-    stageName: "複数タイトル横断",
+    stageName: h.stageName,
     url: h.url,
   }));
+  const manualUrls = new Set(manual.map((m) => m.url));
 
   const raw = await getRunningTournaments();
   const bySerie = new Map<number, (typeof raw)[number]>();
@@ -131,6 +147,11 @@ export async function getRunningSeries(): Promise<RunningSerie[]> {
     .sort((a, b) => tierRank(a.tier) - tierRank(b.tier))
     .map((t) => {
       const game = getGame(t.videogame.slug) as GameConfig;
+      // Worldsは専用ページ(/worlds, 日本時間の日程まとめ)に集約する
+      const url =
+        t.serie.id === WORLDS_SERIE_ID
+          ? "/worlds"
+          : `/${game.slug}/event/${t.serie.id}`;
       return {
         key: `serie:${t.serie.id}`,
         gameName: game.name,
@@ -140,9 +161,10 @@ export async function getRunningSeries(): Promise<RunningSerie[]> {
         leagueImage: t.league.image_url,
         tier: t.tier ?? "",
         stageName: t.name,
-        url: `/${game.slug}/event/${t.serie.id}`,
+        url,
       };
-    });
+    })
+    .filter((s) => !manualUrls.has(s.url));
 
   return [...manual, ...fromApi].slice(0, 6);
 }
