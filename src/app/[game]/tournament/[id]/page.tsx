@@ -10,9 +10,11 @@ import {
   getTournamentMatches,
   getTournamentStandings,
 } from "@/lib/pandascore";
+import { WORLDS_GROUP_STAGE_ID } from "@/lib/worlds";
 import BracketView from "@/components/BracketView";
 import StageProgressBar from "@/components/StageProgressBar";
 import StageTabs from "@/components/StageTabs";
+import SwissBracket from "@/components/SwissBracket";
 import TournamentSchedule from "@/components/TournamentSchedule";
 import TournamentTabs, {
   type TournamentTab,
@@ -216,7 +218,14 @@ export default async function TournamentPage({ params, searchParams }: Props) {
             </section>
           )}
 
-          {!brackets && !standings && (
+          {!brackets && !standings && tournament.id === WORLDS_GROUP_STAGE_ID && (
+            <section>
+              <h2 className="mb-2 text-sm font-semibold">Swiss Stage</h2>
+              <SwissBracket matches={matches} gameSlug={config.slug} />
+            </section>
+          )}
+
+          {!brackets && !standings && tournament.id !== WORLDS_GROUP_STAGE_ID && (
             <p className="rounded-xl border border-border-subtle bg-surface px-4 py-6 text-center text-sm text-muted">
               No bracket or standings data available
             </p>

@@ -9,6 +9,9 @@ export const WORLDS_YEAR = 2026;
 export const WORLDS_SERIE_ID = 11014;
 export const WORLDS_START = "2026-10-15";
 export const WORLDS_END = "2026-11-15";
+// Group Stage(Swiss形式)のtournament_id。トーナメント表タブで簡易Swiss表示を
+// 出し分けるのに使う。シーズンが切り替わったら上のserie_idと合わせて更新すること
+export const WORLDS_GROUP_STAGE_ID = 22047;
 // league_id=297固定なのでロゴURLも年をまたいで変わらない
 export const WORLDS_LEAGUE_IMAGE =
   "https://cdn-api.pandascore.co/images/league/image/297/worlds-png";
