@@ -27,6 +27,7 @@ import MatchRow from "@/components/MatchCard";
 export const metadata: Metadata = {
   title: `Esports World Cup ${EWC_YEAR} — All Games Schedule & Results`,
   description: `Esports World Cup ${EWC_YEAR} schedule and results across every game — VALORANT, League of Legends, CS2, Dota 2, Apex Legends and more — in your local timezone.`,
+  alternates: { canonical: "/ewc" },
 };
 
 const DAY_MS = 86_400_000;

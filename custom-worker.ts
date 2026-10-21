@@ -18,11 +18,72 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import handler from "./.open-next/worker.js";
+import { finishedMatchCacheKey } from "./src/lib/pandascore";
 import { buildTodaySnapshot, writeTodaySnapshot } from "./src/lib/today-snapshot";
 
 interface Env {
   MATCH_CACHE: KVNamespace;
   PANDASCORE_TOKEN?: string;
+}
+
+const MATCH_PAGE_PATTERN = /^\/[a-z0-9-]+\/match\/(\d+)\/?$/;
+const EDGE_CACHE_TTL_SEC = 7 * 24 * 60 * 60; // getMatch()の終了済み試合長期キャッシュと同じ7日
+
+// 終了済みと判明している試合の詳細ページは、2回目以降のアクセスでWorkerの
+// 実行(=CPU時間・PandaScoreへの問い合わせ)を一切発生させずCloudflareのエッジ
+// キャッシュから直接返す。Googlebotが古い試合ページを繰り返し巡回してCPU時間
+// 上限(無料プラン10ms)を超えることがあった問題への対応(2026-10-22)。
+// caches.defaultは拠点ごとに別物(グローバル共有ではない)だが、同じボットは
+// 大体同じ拠点から繰り返しアクセスしてくるのでこの用途には十分機能する。
+// 「終了済みかどうか」はpandascore.tsのgetMatch()が書くKVキー(finishedMatchCacheKey)
+// を見て判断する(HTMLの中身を見て判定するより確実で安い)
+async function handleMatchPage(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext
+): Promise<Response> {
+  // DOM libのCacheStorage型(lib.dom.d.ts)には.defaultが無く、tsconfigの
+  // "dom"指定(他の多くのファイルがブラウザAPIの型を必要とするため)が
+  // Workers版の型より優先されてしまうための回避キャスト
+  const cache = (caches as unknown as { default: Cache }).default;
+  const cacheKey = new Request(request.url, request);
+
+  try {
+    const cached = await cache.match(cacheKey);
+    if (cached) return cached;
+  } catch (err) {
+    console.error("[edge-cache] cache.match failed, falling back to normal render:", err);
+  }
+
+  const response: Response = await handler.fetch(request, env, ctx);
+
+  if (response.ok) {
+    const match = MATCH_PAGE_PATTERN.exec(new URL(request.url).pathname);
+    const matchId = match?.[1];
+    if (matchId) {
+      // response.bodyは一度しか読めないので、クライアントへ返す分とは別に
+      // ここでclone()して独立したストリームを確保してからバックグラウンドへ渡す
+      const responseForCache = response.clone();
+      ctx.waitUntil(
+        (async () => {
+          try {
+            const isFinished = await env.MATCH_CACHE.get(finishedMatchCacheKey(Number(matchId)));
+            if (!isFinished) return;
+            const toCache = new Response(responseForCache.body, responseForCache);
+            toCache.headers.set(
+              "Cache-Control",
+              `public, s-maxage=${EDGE_CACHE_TTL_SEC}, stale-while-revalidate=86400`
+            );
+            await cache.put(cacheKey, toCache);
+          } catch (err) {
+            console.error("[edge-cache] failed to cache finished match page:", err);
+          }
+        })()
+      );
+    }
+  }
+
+  return response;
 }
 
 async function runSnapshotJob(env: Env): Promise<void> {
@@ -51,7 +112,12 @@ async function runSnapshotJob(env: Env): Promise<void> {
 }
 
 export default {
-  fetch: handler.fetch,
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    if (request.method === "GET" && MATCH_PAGE_PATTERN.test(new URL(request.url).pathname)) {
+      return handleMatchPage(request, env, ctx);
+    }
+    return handler.fetch(request, env, ctx);
+  },
   async scheduled(_event, env: Env, ctx) {
     ctx.waitUntil(runSnapshotJob(env));
   },

@@ -2,11 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getGame } from "@/lib/games";
-import {
-  getMatch,
-  getTeam,
-  getTeamRecentMatches,
-} from "@/lib/pandascore";
+import { getMatch, getTeamRecentMatches } from "@/lib/pandascore";
 import { getStartggMatch } from "@/lib/startgg";
 import type { Match, MatchDetail, Team, TeamDetail } from "@/lib/types";
 import { jsonLdString } from "@/lib/seo";
@@ -15,9 +11,16 @@ import MatchLineups from "@/components/MatchLineups";
 import MatchRow from "@/components/MatchCard";
 
 // 試合詳細ページ。
-// 試合前: 両チームのロスター・直近フォーム・過去の対戦成績(H2H)
+// 試合前: 直近フォーム・過去の対戦成績(H2H)。ロスターはチームページへのリンクのみ
+// (/teams/{id}の個別取得をやめ、match.opponentsに既に入っている情報だけ使う。
+// 終わって48時間以上経った試合はH2H/フォームも省略し、PandaScore呼び出しを
+// getMatch 1回だけにする — Googlebotが古い試合ページを大量巡回して無料枠を
+// 消費していた問題への対応、2026-10-22)
 // 試合中/後: マップごとの勝敗とスコア
 // ※選手単位の詳細スタッツと勝率オッズはPandaScoreの有料プラン限定のため未対応
+// ※start.gg出典(Smash/SF6)はgetStartggMatchが既にロスター込みで返すので対象外
+
+const RECENT_FORM_CUTOFF_MS = 48 * 60 * 60_000;
 
 interface Props {
   params: Promise<{ game: string; id: string }>;
@@ -34,6 +37,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const b = match?.opponents[1]?.opponent?.name ?? "TBD";
   return {
     title: match ? `${a} vs ${b} — eMATCH BOARD` : "Match — eMATCH BOARD",
+    alternates: { canonical: `/${game}/match/${id}` },
   };
 }
 
@@ -101,6 +105,7 @@ export default async function MatchPage({ params }: Props) {
   let teamB: TeamDetail | null;
   let recentA: Match[] = [];
   let recentB: Match[] = [];
+  let isOldFinished = false;
 
   if (isStartgg) {
     const result = await getStartggMatch(id);
@@ -111,14 +116,23 @@ export default async function MatchPage({ params }: Props) {
   } else {
     match = await getMatch(id);
     if (!match) notFound();
+    teamA = null;
+    teamB = null;
     const refA = match.opponents[0]?.opponent ?? null;
     const refB = match.opponents[1]?.opponent ?? null;
-    [teamA, teamB, recentA, recentB] = await Promise.all([
-      refA ? getTeam(refA.id) : Promise.resolve(null),
-      refB ? getTeam(refB.id) : Promise.resolve(null),
-      refA ? getTeamRecentMatches(refA.id) : Promise.resolve([]),
-      refB ? getTeamRecentMatches(refB.id) : Promise.resolve([]),
-    ]);
+    // 終わって48時間以上経った試合はH2H/直近フォームを省略し、
+    // このページのPandaScore呼び出しをgetMatch 1回だけにする
+    const endedMs = match.begin_at ? Date.parse(match.begin_at) : null;
+    isOldFinished =
+      match.status === "finished" &&
+      endedMs !== null &&
+      new Date().getTime() - endedMs > RECENT_FORM_CUTOFF_MS;
+    if (!isOldFinished) {
+      [recentA, recentB] = await Promise.all([
+        refA ? getTeamRecentMatches(refA.id) : Promise.resolve([]),
+        refB ? getTeamRecentMatches(refB.id) : Promise.resolve([]),
+      ]);
+    }
   }
 
   const teamARef = match.opponents[0]?.opponent ?? null;
@@ -280,7 +294,7 @@ export default async function MatchPage({ params }: Props) {
         </section>
       )}
 
-      {!isStartgg && (
+      {!isStartgg && !isOldFinished && (
         <section className="grid grid-cols-2 gap-3">
           {[
             { team: teamARef, form: formA },
@@ -333,10 +347,29 @@ export default async function MatchPage({ params }: Props) {
         </section>
       )}
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold">Lineups</h2>
-        <MatchLineups teamA={teamA} teamB={teamB} />
-      </section>
+      {isStartgg ? (
+        <section>
+          <h2 className="mb-2 text-sm font-semibold">Lineups</h2>
+          <MatchLineups teamA={teamA} teamB={teamB} />
+        </section>
+      ) : (
+        (teamARef || teamBRef) && (
+          <section className="flex gap-3">
+            {[teamARef, teamBRef].map(
+              (t) =>
+                t && (
+                  <Link
+                    key={t.id}
+                    href={`/${config.slug}/team/${t.id}`}
+                    className="flex-1 rounded-xl border border-border-subtle bg-surface px-4 py-3 text-center text-xs font-semibold text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+                  >
+                    {t.name} のロスターを見る ›
+                  </Link>
+                )
+            )}
+          </section>
+        )
+      )}
     </div>
   );
 }

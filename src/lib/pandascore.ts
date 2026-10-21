@@ -274,7 +274,9 @@ export async function getTournamentStandings(
 
 // 試合詳細 (マップごとの結果を含む)
 const FINISHED_MATCH_TTL_SEC = 7 * 24 * 60 * 60; // 終了済み試合は結果が変わらないので長めに
-const finishedMatchCacheKey = (id: number) => `match-detail-finished:${id}`;
+// custom-worker.tsのfetchハンドラが「この試合は終了済みと判明している→
+// HTMLごとエッジキャッシュしてよい」の判定に同じキーを使うためexportする
+export const finishedMatchCacheKey = (id: number) => `match-detail-finished:${id}`;
 
 // 終了済み試合はpsFetchの通常キャッシュ(5分)より長い専用キャッシュを先に見る。
 // ボットが古い試合詳細ページを繰り返し巡回してくるケースで、2回目以降は
