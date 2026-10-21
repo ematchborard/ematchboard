@@ -111,9 +111,23 @@ async function runSnapshotJob(env: Env): Promise<void> {
   }
 }
 
+const CANONICAL_HOST = "ematchboard.com";
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    if (request.method === "GET" && MATCH_PAGE_PATTERN.test(new URL(request.url).pathname)) {
+    const url = new URL(request.url);
+
+    // www./http:// → 正規URL(https://ematchboard.com)へ301。next.config.tsの
+    // redirects()(host/header条件)はOpenNext経由だと効かなかった(実測で確認済み)
+    // ため、リクエストを直接見られるここで処理する(2026-10-22)
+    if (url.hostname === `www.${CANONICAL_HOST}` || url.protocol === "http:") {
+      url.hostname = CANONICAL_HOST;
+      url.protocol = "https:";
+      url.port = "";
+      return Response.redirect(url.toString(), 301);
+    }
+
+    if (request.method === "GET" && MATCH_PAGE_PATTERN.test(url.pathname)) {
       return handleMatchPage(request, env, ctx);
     }
     return handler.fetch(request, env, ctx);
