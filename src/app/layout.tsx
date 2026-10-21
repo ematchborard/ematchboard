@@ -66,7 +66,7 @@ export default async function RootLayout({
         <header className="sticky top-0 z-10 border-b border-border-subtle bg-background/90 backdrop-blur">
           <div className="mx-auto w-full max-w-5xl px-4 pt-4 pb-3 md:pb-4">
             <div className="flex items-center justify-between">
-              <Link href="/" className="text-lg font-bold tracking-tight">
+              <Link href="/" prefetch={false} className="text-lg font-bold tracking-tight">
                 <span className="text-brand">e</span>MATCH BOARD
               </Link>
               <div className="flex items-center gap-2">

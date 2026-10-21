@@ -21,6 +21,7 @@ export default function GameTabs({
     <nav className="mt-3 flex gap-5 overflow-x-auto">
       <Link
         href="/"
+        prefetch={false}
         className={`whitespace-nowrap border-b-2 pb-2 text-sm font-semibold transition-colors ${
           pathname === "/"
             ? "border-brand text-brand"
@@ -33,6 +34,7 @@ export default function GameTabs({
         <Link
           key={s.key}
           href={s.url}
+          prefetch={false}
           className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 pb-2 text-sm font-semibold transition-colors ${
             pathname === s.url
               ? "text-foreground"
@@ -46,6 +48,7 @@ export default function GameTabs({
       ))}
       <Link
         href="/ewc"
+        prefetch={false}
         className={`whitespace-nowrap border-b-2 pb-2 text-sm font-semibold transition-colors ${
           pathname === "/ewc" || pathname.startsWith("/ewc/")
             ? "border-amber-400 text-amber-400"
@@ -63,6 +66,7 @@ export default function GameTabs({
             <Link
               key={game.slug}
               href={`/${game.slug}`}
+              prefetch={false}
               className={`whitespace-nowrap border-b-2 pb-2 text-sm font-semibold transition-colors ${
                 active
                   ? ""

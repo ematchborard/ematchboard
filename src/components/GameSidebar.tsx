@@ -62,6 +62,7 @@ function GameRow({
     >
       <Link
         href={`/${game.slug}`}
+        prefetch={false}
         className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium ${
           active ? "" : "text-muted group-hover:text-foreground"
         }`}
@@ -108,6 +109,7 @@ function RunningSerieRow({ serie }: { serie: RunningSerie }) {
   return (
     <Link
       href={serie.url}
+      prefetch={false}
       className="flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors hover:bg-surface-hover"
     >
       {image ? (
@@ -177,6 +179,7 @@ export default function GameSidebar({
       <Card>
         <Link
           href="/"
+          prefetch={false}
           className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
             pathname === "/"
               ? "bg-surface-hover text-brand"
@@ -190,6 +193,7 @@ export default function GameSidebar({
         </Link>
         <Link
           href="/ewc"
+          prefetch={false}
           className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
             isActive("ewc")
               ? "bg-surface-hover text-amber-400"
@@ -307,6 +311,7 @@ export default function GameSidebar({
               >
                 <Link
                   href={href}
+                  prefetch={false}
                   className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-sm font-medium ${
                     active ? "" : "text-muted group-hover:text-foreground"
                   }`}
