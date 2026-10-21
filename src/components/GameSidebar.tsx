@@ -106,6 +106,10 @@ function CardLabel({ children }: { children: React.ReactNode }) {
 
 function RunningSerieRow({ serie }: { serie: RunningSerie }) {
   const image = serie.leagueImage ?? serie.gameLogo;
+  // leagueImage(PandaScore提供)はそのまま使うが、gameLogo(自前ホスト)に
+  // フォールバックしている場合は、サイドバーの他のゲーム一覧(GameLogo)と同じく
+  // game-logo-autoを適用する(未適用だとライトモードで白ロゴが背景に溶けて見にくい)
+  const isGameLogoFallback = !serie.leagueImage && !!serie.gameLogo;
   return (
     <Link
       href={serie.url}
@@ -114,7 +118,13 @@ function RunningSerieRow({ serie }: { serie: RunningSerie }) {
     >
       {image ? (
         // eslint-disable-next-line @next/next/no-img-element -- 外部CDNのリーグ/ゲームロゴ
-        <img src={image} alt="" className="h-5 w-5 shrink-0 object-contain" />
+        <img
+          src={image}
+          alt=""
+          className={`h-5 w-5 shrink-0 object-contain ${
+            isGameLogoFallback && !serie.gameLogoFixedColor ? "game-logo-auto" : ""
+          }`}
+        />
       ) : (
         <span
           className="h-2 w-2 shrink-0 rounded-full"

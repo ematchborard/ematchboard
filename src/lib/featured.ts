@@ -106,6 +106,9 @@ export interface RunningSerie {
   // leagueImageが無いときのフォールバック(そのゲームのロゴ)。
   // 複数タイトル横断のEWC等はnullのまま(色ドットにフォールバック)
   gameLogo: string | null;
+  // gameLogo表示時、GameLogo(サイドバーの他のゲーム一覧)と同じ基準で
+  // game-logo-auto(ライトモードでの色反転)を適用するかどうか
+  gameLogoFixedColor?: boolean;
   tier: string;
   stageName: string;
   url: string;
@@ -188,6 +191,7 @@ export async function getRunningSeries(): Promise<RunningSerie[]> {
         serieName: t.serie.full_name ?? "",
         leagueImage: t.league.image_url,
         gameLogo: game.logo ?? null,
+        gameLogoFixedColor: game.logoFixedColor,
         tier: t.tier ?? "",
         stageName: t.name,
         url,
