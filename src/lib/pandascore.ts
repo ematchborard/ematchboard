@@ -51,7 +51,8 @@ const KV_TTL_SEC = 300;
 const STALE_TTL_SEC = 24 * 60 * 60; // 上流障害時の最終手段。24時間は古くても空よりマシ
 const MIN_KV_WRITE_INTERVAL_MS = 4 * 60_000; // KV書き込みは無料枠(1,000回/日)を守るため5分に1回程度に抑える
 
-async function kvCache(): Promise<KVNamespace | undefined> {
+// today-snapshot.tsがCronの書いたスナップショットを読むのにも使う共通アクセサ
+export async function kvCache(): Promise<KVNamespace | undefined> {
   try {
     const { env } = await getCloudflareContext({ async: true });
     return (env as { MATCH_CACHE?: KVNamespace }).MATCH_CACHE;

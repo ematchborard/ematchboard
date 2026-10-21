@@ -1,7 +1,9 @@
 import { GAMES, getGame, type GameConfig } from "./games";
 import { EWC_END, EWC_START } from "./ewc";
-import { getMatches, getRunningTournaments } from "./pandascore";
+import { jstTodayRange } from "./jst";
+import { getMatches, getRunningTournaments, kvCache } from "./pandascore";
 import { getStartggMatches, type StartggGameSlug } from "./startgg";
+import { readTodaySnapshot } from "./today-snapshot";
 import type { Match } from "./types";
 import {
   WORLDS_END,
@@ -13,41 +15,46 @@ import {
 // ホームの「今日のビッグマッチ」枠とサイドバーの「開催中の大会」枠で使う
 // 横断データ層。/api/today(X投稿下書き用)とも「今日」の定義を共有する。
 
-export function jstTodayRange(): { from: Date; to: Date; dateJst: string } {
-  const now = new Date();
-  const jstMs = now.getTime() + 9 * 60 * 60_000;
-  const jst = new Date(jstMs);
-  const y = jst.getUTCFullYear();
-  const m = jst.getUTCMonth();
-  const d = jst.getUTCDate();
-  const dateJst = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  // JST 00:00 のその日始まりをUTCに戻す(JSTはUTC+9なので前日15:00Z)
-  const fromUtcMs = Date.UTC(y, m, d) - 9 * 60 * 60_000;
-  return {
-    from: new Date(fromUtcMs),
-    to: new Date(fromUtcMs + 24 * 60 * 60_000),
-    dateJst,
-  };
+export { jstTodayRange };
+
+function filterToday(matches: Match[], from: Date, to: Date): Match[] {
+  return matches.filter((m) => {
+    if (!m.begin_at) return false;
+    const t = Date.parse(m.begin_at);
+    return t >= from.getTime() && t < to.getTime();
+  });
 }
 
-// ライブデータ対応タイトル(eventsOnlyを除く)の「今日(JST)」の試合をまとめて取得
+// ライブデータ対応タイトル(eventsOnlyを除く)の「今日(JST)」の試合をまとめて取得。
+// PandaScore採用ゲームはCronが書いたスナップショット(today-snapshot.ts)を読むだけで、
+// リクエストのたびにPandaScoreを叩くことはしない(アクセス数に比例して無料枠を
+// 消費していた問題への対応、2026-10-21)。スナップショットがまだ無い場合
+// (デプロイ直後でCronが一度も走っていない等)だけ直接取得にフォールバックする。
+// start.gg採用タイトル(Smash/SF6)はPandaScoreと別の軽いAPIなので対象外、
+// 従来通りstartgg.ts側のキャッシュ経由で直接取得する
 export async function getTodayMatchesAllGames(): Promise<
   { game: GameConfig; matches: Match[] }[]
 > {
   const { from, to } = jstTodayRange();
   const liveGames = GAMES.filter((g) => !g.eventsOnly);
+  const snapshot = await readTodaySnapshot(await kvCache());
+
   return Promise.all(
     liveGames.map(async (g) => {
-      const matches = await (g.liveSource === "startgg"
-        ? getStartggMatches(g.slug as StartggGameSlug, from, to)
-        : getMatches(g.slug, from, to)
-      ).catch(() => []);
-      const todays = matches.filter((m) => {
-        if (!m.begin_at) return false;
-        const t = Date.parse(m.begin_at);
-        return t >= from.getTime() && t < to.getTime();
-      });
-      return { game: g, matches: todays };
+      if (g.liveSource === "startgg") {
+        const matches = await getStartggMatches(
+          g.slug as StartggGameSlug,
+          from,
+          to
+        ).catch(() => []);
+        return { game: g, matches: filterToday(matches, from, to) };
+      }
+      const fromSnapshot = snapshot?.perGame[g.slug];
+      if (fromSnapshot) {
+        return { game: g, matches: filterToday(fromSnapshot, from, to) };
+      }
+      const matches = await getMatches(g.slug, from, to).catch(() => []);
+      return { game: g, matches: filterToday(matches, from, to) };
     })
   );
 }

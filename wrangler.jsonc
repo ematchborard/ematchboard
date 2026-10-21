@@ -2,7 +2,9 @@
   // Cloudflare Workers の設定 (OpenNext アダプタ経由で Next.js を動かす)
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ematchboard",
-  "main": ".open-next/worker.js",
+  // .open-next/worker.js(OpenNext生成のfetchハンドラ)をそのまま再exportしつつ
+  // scheduled()を足したラッパー。詳細はcustom-worker.tsのコメント参照
+  "main": "custom-worker.ts",
   "compatibility_date": "2026-06-01",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
@@ -11,6 +13,11 @@
   },
   "observability": {
     "enabled": true
+  },
+  // 「今日の全ゲーム分の試合」スナップショットをKVに書くCron(5分おき)。
+  // UTC基準(Cloudflareの仕様)だが間隔指定なのでJSTとのズレは影響しない
+  "triggers": {
+    "crons": ["*/5 * * * *"]
   },
   // 試合データの拠点間共有キャッシュ(caches.defaultは拠点ごとに別物で
   // グローバル共有ではなかったため、2026-10-11にKVへ移行)。
