@@ -28,8 +28,19 @@
       "binding": "MATCH_CACHE",
       "id": "1ab87e397f9b483189206a68fc2d21cf"
     }
+  ],
+  // ファン採点機能(ratings/comments/comment_likes)用。
+  // スキーマはmigrations/配下、適用はCloudflareダッシュボードのD1コンソールから
+  // (このマシンはwrangler未認証のため)。Step 1時点ではコードからまだ参照しない
+  "d1_databases": [
+    {
+      "binding": "RATINGS_DB",
+      "database_name": "ematchboard-ratings",
+      "database_id": "6e3227a1-a06a-4c37-b5ff-30fdaa8e6d22"
+    }
   ]
-  // PANDASCORE_TOKEN は絶対にここに書かない。デプロイ後に
-  //   npx wrangler secret put PANDASCORE_TOKEN
-  // で登録する(ローカルプレビュー用は .dev.vars に書く)
+  // PANDASCORE_TOKEN・TURNSTILE_SECRET_KEY は絶対にここに書かない。
+  // Cloudflareダッシュボード(Workers & Pages → ematchboard → Settings →
+  // Variables and Secrets)からSecretとして登録する
+  // (ローカルプレビュー用は .dev.vars に書く)
 }
