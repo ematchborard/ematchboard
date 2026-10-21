@@ -36,6 +36,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: config
       ? `${config.name} esports schedule: upcoming matches, live scores, results, tournament brackets and team rosters — all shown in your local timezone.`
       : undefined,
+    // view/o/dのクエリ違いは同じページの別表示なので、正規URLはベースパスに統一する
+    alternates: { canonical: `/${game}` },
   };
 }
 

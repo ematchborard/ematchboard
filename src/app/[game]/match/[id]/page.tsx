@@ -34,6 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const b = match?.opponents[1]?.opponent?.name ?? "TBD";
   return {
     title: match ? `${a} vs ${b} — eMATCH BOARD` : "Match — eMATCH BOARD",
+    alternates: { canonical: `/${game}/match/${id}` },
   };
 }
 

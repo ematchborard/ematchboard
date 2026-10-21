@@ -30,6 +30,7 @@ export const metadata: Metadata = {
     title: `Worlds ${WORLDS_YEAR} 日程・結果【日本時間】`,
     description: `LoL世界選手権「Worlds ${WORLDS_YEAR}」の全試合を日本時間で。グループステージ・プレーオフの日程と結果をまとめてチェック。`,
   },
+  alternates: { canonical: "/worlds" },
 };
 
 function jstDayKey(iso: string): string {

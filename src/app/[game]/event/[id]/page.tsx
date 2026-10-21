@@ -34,7 +34,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = serie
     ? `${serie.league?.name ?? ""} ${serie.full_name ?? ""}`.trim()
     : "Event";
-  return { title: `${title} — eMATCH BOARD` };
+  return {
+    title: `${title} — eMATCH BOARD`,
+    alternates: { canonical: `/${game}/event/${id}` },
+  };
 }
 
 export default async function EventPage({ params }: Props) {
