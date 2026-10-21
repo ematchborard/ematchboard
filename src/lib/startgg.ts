@@ -87,9 +87,11 @@ function stableId(label: string): number {
 // 以前はcaches.defaultだったが拠点ごとに別物でグローバル共有ではなく、
 // 海外アクセスでキャッシュが温まってない拠点が上流失敗を即座に空表示に
 // してしまう不具合があった。詳細はpandascore.tsのコメント参照)
-const memCache = new Map<string, { expires: number; data: unknown }>();
+const memCache = new Map<string, { expires: number; data: unknown; raw: string; lastKvWrite: number }>();
 const MEM_TTL_MS = 5 * 60_000;
 const KV_TTL_SEC = 300;
+const STALE_TTL_SEC = 24 * 60 * 60; // 上流障害時の最終手段。詳細はpandascore.tsのコメント参照
+const MIN_KV_WRITE_INTERVAL_MS = 4 * 60_000;
 
 async function kvCache(): Promise<KVNamespace | undefined> {
   try {
@@ -98,6 +100,23 @@ async function kvCache(): Promise<KVNamespace | undefined> {
   } catch {
     return undefined;
   }
+}
+
+async function readStale<T>(
+  kv: KVNamespace | undefined,
+  staleKey: string,
+  hit: { data: unknown } | undefined
+): Promise<T | null> {
+  if (hit) return hit.data as T;
+  if (kv) {
+    try {
+      const stale = await kv.get<T>(staleKey, "json");
+      if (stale !== null) return stale;
+    } catch {
+      // 無視
+    }
+  }
+  return null;
 }
 
 // KVのキー長上限(512バイト)に収まるよう、クエリ+変数をハッシュ化する
@@ -121,6 +140,7 @@ async function sgQuery<T>(
 ): Promise<T | null> {
   const rawKey = `${JSON.stringify(variables)}::${query.replace(/\s+/g, " ").trim()}`;
   const cacheKey = `sg:${hashKey(rawKey)}`;
+  const staleKey = `stale:${cacheKey}`;
 
   const hit = memCache.get(cacheKey);
   if (hit && hit.expires > Date.now()) return hit.data as T;
@@ -130,7 +150,12 @@ async function sgQuery<T>(
     try {
       const cached = await kv.get<T>(cacheKey, "json");
       if (cached !== null) {
-        memCache.set(cacheKey, { expires: Date.now() + MEM_TTL_MS, data: cached });
+        memCache.set(cacheKey, {
+          expires: Date.now() + MEM_TTL_MS,
+          data: cached,
+          raw: JSON.stringify(cached),
+          lastKvWrite: hit?.lastKvWrite ?? Date.now(),
+        });
         return cached;
       }
     } catch {
@@ -150,32 +175,45 @@ async function sgQuery<T>(
       next: { revalidate: 300 },
     });
   } catch {
-    return hit ? (hit.data as T) : null;
+    return readStale<T>(kv, staleKey, hit);
   }
-  if (!res.ok) return hit ? (hit.data as T) : null;
+
+  console.log(
+    `[startgg] ${res.status} remaining=${res.headers.get("x-ratelimit-remaining") ?? "?"}`
+  );
+
+  if (!res.ok) return readStale<T>(kv, staleKey, hit);
 
   const json = (await res.json()) as {
     data: T;
     errors?: { message: string }[];
   };
   if (json.errors && json.errors.length > 0) {
-    return hit ? (hit.data as T) : null;
+    return readStale<T>(kv, staleKey, hit);
   }
   const data = json.data;
+  const raw = JSON.stringify(data);
 
-  memCache.set(cacheKey, { expires: Date.now() + MEM_TTL_MS, data });
+  memCache.set(cacheKey, { expires: Date.now() + MEM_TTL_MS, data, raw, lastKvWrite: hit?.lastKvWrite ?? 0 });
   if (memCache.size > 200) {
     for (const [k, v] of memCache) {
       if (v.expires < Date.now()) memCache.delete(k);
     }
   }
   if (kv) {
-    try {
-      await kv.put(cacheKey, JSON.stringify(data), {
-        expirationTtl: KV_TTL_SEC,
-      });
-    } catch {
-      // キャッシュ保存失敗は無視
+    const unchanged = hit?.raw === raw;
+    const recentlyWritten = Date.now() - (hit?.lastKvWrite ?? 0) < MIN_KV_WRITE_INTERVAL_MS;
+    if (!(unchanged && recentlyWritten)) {
+      try {
+        await Promise.all([
+          kv.put(cacheKey, raw, { expirationTtl: KV_TTL_SEC }),
+          kv.put(staleKey, raw, { expirationTtl: STALE_TTL_SEC }),
+        ]);
+        const entry = memCache.get(cacheKey);
+        if (entry) entry.lastKvWrite = Date.now();
+      } catch {
+        // キャッシュ保存失敗は無視
+      }
     }
   }
   return data;

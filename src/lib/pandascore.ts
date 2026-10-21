@@ -39,10 +39,17 @@ export function hasApiToken(): boolean {
 //     空の状態から上流に生アクセスし、そこで失敗すると救えず空表示になっていた
 //     (2026-10-11、海外アクセスで試合0件になる不具合として発覚)。KVは拠点間で
 //     数十秒程度のラグはあるが共有されるため、この問題を構造的に解消する。
-//  3. 上流が429等で失敗したら、期限切れのメモリキャッシュでも返す(空表示より古いデータ)
-const memCache = new Map<string, { expires: number; data: unknown }>();
+//  3. 上流が429等で失敗したら、まずプロセス内の期限切れキャッシュ、無ければ
+//     KVの「古いデータでも可」バックアップ(stale:プレフィックス、TTL24時間)を返す。
+//     プロセス内メモリはWorkersのisolateごとに別物で当てにならないため
+//     (コールドスタートだと毎回空)、isoateをまたいで共有されるKV側のバックアップが
+//     本命。これで上流が長時間落ちても空表示にはならない
+//     (2026-10-21、/api/todayが断続的に空/一部ゲーム欠けになる不具合として発覚)。
+const memCache = new Map<string, { expires: number; data: unknown; raw: string; lastKvWrite: number }>();
 const MEM_TTL_MS = 5 * 60_000;
 const KV_TTL_SEC = 300;
+const STALE_TTL_SEC = 24 * 60 * 60; // 上流障害時の最終手段。24時間は古くても空よりマシ
+const MIN_KV_WRITE_INTERVAL_MS = 4 * 60_000; // KV書き込みは無料枠(1,000回/日)を守るため5分に1回程度に抑える
 
 async function kvCache(): Promise<KVNamespace | undefined> {
   try {
@@ -54,12 +61,32 @@ async function kvCache(): Promise<KVNamespace | undefined> {
   }
 }
 
+// 上流フェッチが失敗したときの最終手段。プロセス内の期限切れキャッシュ(速いが
+// isolateローカル)→ KVの古いデータバックアップ(遅いがisolateをまたいで共有)の順
+async function readStale<T>(
+  kv: KVNamespace | undefined,
+  staleKey: string,
+  hit: { data: unknown } | undefined
+): Promise<T | null> {
+  if (hit) return hit.data as T;
+  if (kv) {
+    try {
+      const stale = await kv.get<T>(staleKey, "json");
+      if (stale !== null) return stale;
+    } catch {
+      // 無視
+    }
+  }
+  return null;
+}
+
 async function psFetch<T>(
   path: string,
   params: Record<string, string> = {}
 ): Promise<T> {
   const query = new URLSearchParams(params).toString();
   const url = `${API_BASE}${path}${query ? `?${query}` : ""}`;
+  const staleKey = `stale:${url}`;
 
   const hit = memCache.get(url);
   if (hit && hit.expires > Date.now()) return hit.data as T;
@@ -70,7 +97,12 @@ async function psFetch<T>(
     try {
       const cached = await kv.get<T>(url, "json");
       if (cached !== null) {
-        memCache.set(url, { expires: Date.now() + MEM_TTL_MS, data: cached });
+        memCache.set(url, {
+          expires: Date.now() + MEM_TTL_MS,
+          data: cached,
+          raw: JSON.stringify(cached),
+          lastKvWrite: hit?.lastKvWrite ?? Date.now(),
+        });
         return cached;
       }
     } catch {
@@ -89,28 +121,46 @@ async function psFetch<T>(
       next: { revalidate: 300 },
     });
   } catch (err) {
-    if (hit) return hit.data as T; // 通信失敗: 期限切れキャッシュで凌ぐ
+    const stale = await readStale<T>(kv, staleKey, hit);
+    if (stale !== null) return stale;
     throw err;
   }
+
+  console.log(
+    `[pandascore] ${res.status} ${path} remaining=${res.headers.get("x-rate-limit-remaining") ?? "?"}`
+  );
+
   if (!res.ok) {
-    if (hit) return hit.data as T; // レート制限(429)等: 同上
+    const stale = await readStale<T>(kv, staleKey, hit);
+    if (stale !== null) return stale;
     throw new Error(`PandaScore error ${res.status} for ${path}`);
   }
   const data = (await res.json()) as T;
+  const raw = JSON.stringify(data);
 
-  memCache.set(url, { expires: Date.now() + MEM_TTL_MS, data });
+  memCache.set(url, { expires: Date.now() + MEM_TTL_MS, data, raw, lastKvWrite: hit?.lastKvWrite ?? 0 });
   if (memCache.size > 500) {
     for (const [k, v] of memCache) {
       if (v.expires < Date.now()) memCache.delete(k);
     }
   }
+
   if (kv) {
-    try {
-      await kv.put(url, JSON.stringify(data), {
-        expirationTtl: KV_TTL_SEC,
-      });
-    } catch {
-      // キャッシュ保存失敗は無視(次回また上流から取る)
+    // 内容が前回と同じで、かつ最近書き込み済みなら書き込みをスキップ
+    // (無料枠1,000回/日を守るため。内容が変わっていれば間隔を無視して書く)
+    const unchanged = hit?.raw === raw;
+    const recentlyWritten = Date.now() - (hit?.lastKvWrite ?? 0) < MIN_KV_WRITE_INTERVAL_MS;
+    if (!(unchanged && recentlyWritten)) {
+      try {
+        await Promise.all([
+          kv.put(url, raw, { expirationTtl: KV_TTL_SEC }),
+          kv.put(staleKey, raw, { expirationTtl: STALE_TTL_SEC }),
+        ]);
+        const entry = memCache.get(url);
+        if (entry) entry.lastKvWrite = Date.now();
+      } catch {
+        // キャッシュ保存失敗は無視(次回また上流から取る)
+      }
     }
   }
   return data;
