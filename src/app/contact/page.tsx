@@ -3,7 +3,6 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Contact — eMATCH BOARD",
-  alternates: { canonical: "/contact" },
 };
 
 export default function ContactPage() {

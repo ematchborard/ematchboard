@@ -4,7 +4,6 @@ import { GAMES } from "@/lib/games";
 
 export const metadata: Metadata = {
   title: "About — eMATCH BOARD",
-  alternates: { canonical: "/about" },
 };
 
 export default function AboutPage() {

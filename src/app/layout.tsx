@@ -36,8 +36,6 @@ export const metadata: Metadata = {
     description:
       "All esports schedules in one place. VALORANT, LoL, CS2, Dota 2 and more — in your local timezone.",
   },
-  // ルートの既定値(ホーム用)。個別ページはそれぞれのgenerateMetadataで上書きする
-  alternates: { canonical: "/" },
   verification: {
     google: "5XCLyjKuD-EoH4Q1N4um_HDpPa5obmnduKGMAzHOiko",
   },

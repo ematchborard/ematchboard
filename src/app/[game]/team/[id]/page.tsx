@@ -11,11 +11,10 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { game, id } = await params;
+  const { id } = await params;
   const team = await getTeam(Number(id));
   return {
     title: team ? `${team.name} — eMATCH BOARD` : "Team — eMATCH BOARD",
-    alternates: { canonical: `/${game}/team/${id}` },
   };
 }
 

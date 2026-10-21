@@ -40,7 +40,7 @@ function tournamentTitle(
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { game, id } = await params;
+  const { id } = await params;
   const tournament = await getTournament(Number(id));
   if (!tournament) return { title: "Tournament — eMATCH BOARD" };
 
@@ -60,7 +60,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: fullTitle,
     description,
     openGraph: { title: fullTitle, description, type: "website" },
-    alternates: { canonical: `/${game}/tournament/${id}` },
   };
 }
 
