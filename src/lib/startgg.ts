@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { cache } from "react";
 import type {
   Match,
   MatchDetail,
@@ -138,86 +139,97 @@ async function sgQuery<T>(
   query: string,
   variables: Record<string, unknown>,
 ): Promise<T | null> {
-  const rawKey = `${JSON.stringify(variables)}::${query.replace(/\s+/g, " ").trim()}`;
+  const variablesJson = JSON.stringify(variables);
+  const rawKey = `${variablesJson}::${query.replace(/\s+/g, " ").trim()}`;
   const cacheKey = `sg:${hashKey(rawKey)}`;
-  const staleKey = `stale:${cacheKey}`;
-
-  const hit = memCache.get(cacheKey);
-  if (hit && hit.expires > Date.now()) return hit.data as T;
-
-  const kv = await kvCache();
-  if (kv) {
-    try {
-      const cached = await kv.get<T>(cacheKey, "json");
-      if (cached !== null) {
-        memCache.set(cacheKey, {
-          expires: Date.now() + MEM_TTL_MS,
-          data: cached,
-          raw: JSON.stringify(cached),
-          lastKvWrite: hit?.lastKvWrite ?? Date.now(),
-        });
-        return cached;
-      }
-    } catch {
-      // KV読み取り失敗は無視して上流へ
-    }
-  }
-
-  let res: Response;
-  try {
-    res = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.STARTGG_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ query, variables }),
-      next: { revalidate: 300 },
-    });
-  } catch {
-    return readStale<T>(kv, staleKey, hit);
-  }
-
-  console.log(
-    `[startgg] ${res.status} remaining=${res.headers.get("x-ratelimit-remaining") ?? "?"}`
-  );
-
-  if (!res.ok) return readStale<T>(kv, staleKey, hit);
-
-  const json = (await res.json()) as {
-    data: T;
-    errors?: { message: string }[];
-  };
-  if (json.errors && json.errors.length > 0) {
-    return readStale<T>(kv, staleKey, hit);
-  }
-  const data = json.data;
-  const raw = JSON.stringify(data);
-
-  memCache.set(cacheKey, { expires: Date.now() + MEM_TTL_MS, data, raw, lastKvWrite: hit?.lastKvWrite ?? 0 });
-  if (memCache.size > 200) {
-    for (const [k, v] of memCache) {
-      if (v.expires < Date.now()) memCache.delete(k);
-    }
-  }
-  if (kv) {
-    const unchanged = hit?.raw === raw;
-    const recentlyWritten = Date.now() - (hit?.lastKvWrite ?? 0) < MIN_KV_WRITE_INTERVAL_MS;
-    if (!(unchanged && recentlyWritten)) {
-      try {
-        await Promise.all([
-          kv.put(cacheKey, raw, { expirationTtl: KV_TTL_SEC }),
-          kv.put(staleKey, raw, { expirationTtl: STALE_TTL_SEC }),
-        ]);
-        const entry = memCache.get(cacheKey);
-        if (entry) entry.lastKvWrite = Date.now();
-      } catch {
-        // キャッシュ保存失敗は無視
-      }
-    }
-  }
-  return data;
+  return fetchByKey(cacheKey, query, variablesJson) as Promise<T | null>;
 }
+
+// cacheKey・query・variables(JSON文字列化済み)をすべて文字列にしてReact cache()で
+// メモ化する。理由はpandascore.tsのfetchByUrlと同じ(オブジェクト引数だと参照一致でしか
+// 見ないためvariablesをそのまま渡すとキャッシュが効かない)
+const fetchByKey = cache(
+  async (cacheKey: string, query: string, variablesJson: string): Promise<unknown> => {
+    const variables = JSON.parse(variablesJson) as Record<string, unknown>;
+    const staleKey = `stale:${cacheKey}`;
+
+    const hit = memCache.get(cacheKey);
+    if (hit && hit.expires > Date.now()) return hit.data;
+
+    const kv = await kvCache();
+    if (kv) {
+      try {
+        const cached = await kv.get<unknown>(cacheKey, "json");
+        if (cached !== null) {
+          memCache.set(cacheKey, {
+            expires: Date.now() + MEM_TTL_MS,
+            data: cached,
+            raw: JSON.stringify(cached),
+            lastKvWrite: hit?.lastKvWrite ?? Date.now(),
+          });
+          return cached;
+        }
+      } catch {
+        // KV読み取り失敗は無視して上流へ
+      }
+    }
+
+    let res: Response;
+    try {
+      res = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.STARTGG_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query, variables }),
+        next: { revalidate: 300 },
+      });
+    } catch {
+      return readStale<unknown>(kv, staleKey, hit);
+    }
+
+    console.log(
+      `[startgg] ${res.status} remaining=${res.headers.get("x-ratelimit-remaining") ?? "?"}`
+    );
+
+    if (!res.ok) return readStale<unknown>(kv, staleKey, hit);
+
+    const json = (await res.json()) as {
+      data: unknown;
+      errors?: { message: string }[];
+    };
+    if (json.errors && json.errors.length > 0) {
+      return readStale<unknown>(kv, staleKey, hit);
+    }
+    const data = json.data;
+    const raw = JSON.stringify(data);
+
+    memCache.set(cacheKey, { expires: Date.now() + MEM_TTL_MS, data, raw, lastKvWrite: hit?.lastKvWrite ?? 0 });
+    if (memCache.size > 200) {
+      for (const [k, v] of memCache) {
+        if (v.expires < Date.now()) memCache.delete(k);
+      }
+    }
+    if (kv) {
+      const unchanged = hit?.raw === raw;
+      const recentlyWritten = Date.now() - (hit?.lastKvWrite ?? 0) < MIN_KV_WRITE_INTERVAL_MS;
+      if (!(unchanged && recentlyWritten)) {
+        try {
+          await Promise.all([
+            kv.put(cacheKey, raw, { expirationTtl: KV_TTL_SEC }),
+            kv.put(staleKey, raw, { expirationTtl: STALE_TTL_SEC }),
+          ]);
+          const entry = memCache.get(cacheKey);
+          if (entry) entry.lastKvWrite = Date.now();
+        } catch {
+          // キャッシュ保存失敗は無視
+        }
+      }
+    }
+    return data;
+  }
+);
 
 function mapState(state: number): MatchStatus {
   if (state === 3) return "finished";

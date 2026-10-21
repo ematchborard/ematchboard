@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { cache } from "react";
 import type {
   BracketMatch,
   Match,
@@ -81,22 +82,31 @@ async function readStale<T>(
   return null;
 }
 
-async function psFetch<T>(
-  path: string,
-  params: Record<string, string> = {}
-): Promise<T> {
+function psFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const query = new URLSearchParams(params).toString();
   const url = `${API_BASE}${path}${query ? `?${query}` : ""}`;
+  return fetchByUrl(url, path) as Promise<T>;
+}
+
+// URL文字列だけをキーにリクエスト単位でメモ化(React cache)。generateMetadataと
+// ページ本体が同じデータを並行して要求するケース(例: 試合詳細ページがgetMatch(id)を
+// 2回呼ぶ)で、どちらも先発のPromiseを共有して上流への重複フェッチを防ぐ
+// (2026-10-21、ボットの巡回で/matches/{id}が1リクエストにつき2回飛んでいた不具合への対応)。
+// psFetch自体ではなくURL文字列だけをキーにする独立関数にしているのは、Reactのcache()は
+// オブジェクト引数を参照一致でしか見ないため(paramsは呼び出しごとに新しいオブジェクトなので
+// そのままだとキャッシュが効かない)。モジュール読み込み時に1回だけcache()するよう
+// トップレベルで定義すること(呼び出しのたびに作るとキャッシュの意味が無くなる)
+const fetchByUrl = cache(async (url: string, path: string): Promise<unknown> => {
   const staleKey = `stale:${url}`;
 
   const hit = memCache.get(url);
-  if (hit && hit.expires > Date.now()) return hit.data as T;
+  if (hit && hit.expires > Date.now()) return hit.data;
 
   // KVキャッシュ(URLのみがキーで、トークンは含まれないので安全)
   const kv = await kvCache();
   if (kv) {
     try {
-      const cached = await kv.get<T>(url, "json");
+      const cached = await kv.get<unknown>(url, "json");
       if (cached !== null) {
         memCache.set(url, {
           expires: Date.now() + MEM_TTL_MS,
@@ -122,7 +132,7 @@ async function psFetch<T>(
       next: { revalidate: 300 },
     });
   } catch (err) {
-    const stale = await readStale<T>(kv, staleKey, hit);
+    const stale = await readStale<unknown>(kv, staleKey, hit);
     if (stale !== null) return stale;
     throw err;
   }
@@ -132,11 +142,11 @@ async function psFetch<T>(
   );
 
   if (!res.ok) {
-    const stale = await readStale<T>(kv, staleKey, hit);
+    const stale = await readStale<unknown>(kv, staleKey, hit);
     if (stale !== null) return stale;
     throw new Error(`PandaScore error ${res.status} for ${path}`);
   }
-  const data = (await res.json()) as T;
+  const data: unknown = await res.json();
   const raw = JSON.stringify(data);
 
   memCache.set(url, { expires: Date.now() + MEM_TTL_MS, data, raw, lastKvWrite: hit?.lastKvWrite ?? 0 });
@@ -165,7 +175,7 @@ async function psFetch<T>(
     }
   }
   return data;
-}
+});
 
 export async function getMatches(
   gameSlug: string,
@@ -263,10 +273,37 @@ export async function getTournamentStandings(
 }
 
 // 試合詳細 (マップごとの結果を含む)
+const FINISHED_MATCH_TTL_SEC = 7 * 24 * 60 * 60; // 終了済み試合は結果が変わらないので長めに
+const finishedMatchCacheKey = (id: number) => `match-detail-finished:${id}`;
+
+// 終了済み試合はpsFetchの通常キャッシュ(5分)より長い専用キャッシュを先に見る。
+// ボットが古い試合詳細ページを繰り返し巡回してくるケースで、2回目以降は
+// PandaScoreに一切問い合わせずに返せるようにするため(2026-10-21対応)
 export async function getMatch(id: number): Promise<MatchDetail | null> {
   if (!hasApiToken()) return mockMatchDetail(id);
+
+  const kv = await kvCache();
+  if (kv) {
+    try {
+      const cached = await kv.get<MatchDetail>(finishedMatchCacheKey(id), "json");
+      if (cached) return cached;
+    } catch {
+      // 無視して通常取得へ
+    }
+  }
+
   try {
-    return await psFetch<MatchDetail>(`/matches/${id}`);
+    const match = await psFetch<MatchDetail>(`/matches/${id}`);
+    if (match.status === "finished" && kv) {
+      try {
+        await kv.put(finishedMatchCacheKey(id), JSON.stringify(match), {
+          expirationTtl: FINISHED_MATCH_TTL_SEC,
+        });
+      } catch {
+        // キャッシュ保存失敗は無視
+      }
+    }
+    return match;
   } catch {
     return null;
   }

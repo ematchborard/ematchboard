@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { GAMES, getGame, type GameConfig } from "./games";
 import { EWC_END, EWC_START } from "./ewc";
 import { jstTodayRange } from "./jst";
@@ -16,6 +17,11 @@ import {
 // 横断データ層。/api/today(X投稿下書き用)とも「今日」の定義を共有する。
 
 export { jstTodayRange };
+
+// Cronスナップショットの読み取りをリクエスト単位でメモ化(React cache)。
+// ホームでは getTodayMatchesAllGames と getRunningSeries の両方が同じ
+// スナップショットを読むので、1リクエスト内でのKV二重読みを避ける
+const getSnapshot = cache(async () => readTodaySnapshot(await kvCache()));
 
 function filterToday(matches: Match[], from: Date, to: Date): Match[] {
   return matches.filter((m) => {
@@ -37,7 +43,7 @@ export async function getTodayMatchesAllGames(): Promise<
 > {
   const { from, to } = jstTodayRange();
   const liveGames = GAMES.filter((g) => !g.eventsOnly);
-  const snapshot = await readTodaySnapshot(await kvCache());
+  const snapshot = await getSnapshot();
 
   return Promise.all(
     liveGames.map(async (g) => {
@@ -152,7 +158,10 @@ export async function getRunningSeries(): Promise<RunningSerie[]> {
   }));
   const manualUrls = new Set(manual.map((m) => m.url));
 
-  const raw = await getRunningTournaments();
+  // Cronスナップショットから読む(無ければ直接取得にフォールバック)。
+  // /tournaments/runningもリクエストのたびに叩くと無料枠を消費するため
+  const snapshot = await getSnapshot();
+  const raw = snapshot?.runningTournaments ?? (await getRunningTournaments());
   const bySerie = new Map<number, (typeof raw)[number]>();
   for (const t of raw) {
     if (!t.serie || !getGame(t.videogame.slug)) continue; // 未対応タイトルは除外

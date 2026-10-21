@@ -18,7 +18,7 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import handler from "./.open-next/worker.js";
-import { buildTodaySnapshot, TODAY_SNAPSHOT_KEY } from "./src/lib/today-snapshot";
+import { buildTodaySnapshot, writeTodaySnapshot } from "./src/lib/today-snapshot";
 
 interface Env {
   MATCH_CACHE: KVNamespace;
@@ -31,12 +31,19 @@ async function runSnapshotJob(env: Env): Promise<void> {
     return;
   }
   try {
-    const snapshot = await buildTodaySnapshot(env.PANDASCORE_TOKEN);
-    await env.MATCH_CACHE.put(TODAY_SNAPSHOT_KEY, JSON.stringify(snapshot), {
-      expirationTtl: 60 * 60, // 次のCronが来なくても1時間で自動失効(古すぎるデータで止まるのを防ぐ)
-    });
+    const result = await buildTodaySnapshot(env.PANDASCORE_TOKEN);
+    const { written, keptFromPrevious } = await writeTodaySnapshot(env.MATCH_CACHE, result);
+    if (!written) {
+      console.error(
+        `[cron] all ${result.totalGames} games + tournaments/running failed, skipping write to keep previous snapshot`
+      );
+      return;
+    }
+    const okGames = result.totalGames - result.failedGames.length;
+    const totalMatches = Object.values(result.snapshot.perGame).reduce((n, m) => n + m.length, 0);
     console.log(
-      `[cron] snapshot written: ${Object.keys(snapshot.perGame).length} games, ${Object.values(snapshot.perGame).reduce((n, m) => n + m.length, 0)} matches`
+      `[cron] snapshot written: ${okGames}/${result.totalGames} games fresh, ${totalMatches} matches` +
+        (keptFromPrevious.length > 0 ? `, kept previous for: ${keptFromPrevious.join(",")}` : "")
     );
   } catch (err) {
     console.error("[cron] snapshot build failed:", err);
