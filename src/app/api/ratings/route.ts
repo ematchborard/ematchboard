@@ -8,6 +8,12 @@ import { clientIp, getOrCreateVoterId, ipHash, readVoterId, voterHash } from "@/
 // 済ませたいので、このAPIは「投票があったplayer_idの集計を返す」だけで、
 // 大会のロスター一覧そのものは持たない(画面側で表示する選手一覧はステップ3で
 // 別途用意する)。
+//
+// 2026-10-22、終了済み試合ページ自体をcustom-worker.tsでCache API(7日間)に
+// フルページキャッシュするようになったため、このAPIは明示的に
+// Cache-Control: no-storeを付けている。平均点・自分の投票・Cookie発行は
+// 全てこのAPI経由(ページのHTMLには一切埋め込まない)なので、試合ページが
+// 他の訪問者とキャッシュ共有されても個人情報が混ざることはない。
 
 const RATE_LIMIT_WINDOW_MINUTES = 10;
 const RATE_LIMIT_MAX_VOTES = 20;
@@ -23,16 +29,23 @@ function isPositiveInt(v: unknown): v is number {
   return typeof v === "number" && Number.isInteger(v) && v > 0;
 }
 
+function json(data: unknown, init?: { status?: number }): NextResponse {
+  return NextResponse.json(data, {
+    status: init?.status,
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
 export async function GET(request: NextRequest) {
   const matchIdParam = request.nextUrl.searchParams.get("matchId");
   const matchId = matchIdParam ? Number(matchIdParam) : NaN;
   if (!isPositiveInt(matchId)) {
-    return NextResponse.json({ error: "matchId is required" }, { status: 400 });
+    return json({ error: "matchId is required" }, { status: 400 });
   }
 
   const db = await ratingsDb();
   if (!db) {
-    return NextResponse.json({ error: "ratings database unavailable" }, { status: 503 });
+    return json({ error: "ratings database unavailable" }, { status: 503 });
   }
 
   const { results } = await db
@@ -59,28 +72,28 @@ export async function GET(request: NextRequest) {
     yourVotes = Object.fromEntries(own.map((r) => [r.player_id, r.score]));
   }
 
-  return NextResponse.json({ matchId, players, yourVotes });
+  return json({ matchId, players, yourVotes });
 }
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as VoteBody | null;
   if (!body) {
-    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+    return json({ error: "invalid JSON body" }, { status: 400 });
   }
   const { matchId, playerId, score, turnstileToken } = body;
   if (!isPositiveInt(matchId) || !isPositiveInt(playerId)) {
-    return NextResponse.json({ error: "matchId and playerId must be positive integers" }, { status: 400 });
+    return json({ error: "matchId and playerId must be positive integers" }, { status: 400 });
   }
   if (typeof score !== "number" || !Number.isInteger(score) || score < 1 || score > 10) {
-    return NextResponse.json({ error: "score must be an integer from 1 to 10" }, { status: 400 });
+    return json({ error: "score must be an integer from 1 to 10" }, { status: 400 });
   }
   if (typeof turnstileToken !== "string" || turnstileToken.length === 0) {
-    return NextResponse.json({ error: "turnstileToken is required" }, { status: 400 });
+    return json({ error: "turnstileToken is required" }, { status: 400 });
   }
 
   const db = await ratingsDb();
   if (!db) {
-    return NextResponse.json({ error: "ratings database unavailable" }, { status: 503 });
+    return json({ error: "ratings database unavailable" }, { status: 503 });
   }
 
   const ip = clientIp(request);
@@ -93,12 +106,12 @@ export async function POST(request: NextRequest) {
     .bind(ipHashValue)
     .first<{ count: number }>()) ?? { count: 0 };
   if (recentVotes >= RATE_LIMIT_MAX_VOTES) {
-    return NextResponse.json({ error: "too many votes, please try again later" }, { status: 429 });
+    return json({ error: "too many votes, please try again later" }, { status: 429 });
   }
 
   const verified = await verifyTurnstile(turnstileToken, ip);
   if (!verified) {
-    return NextResponse.json({ error: "turnstile verification failed" }, { status: 403 });
+    return json({ error: "turnstile verification failed" }, { status: 403 });
   }
 
   const voterId = await getOrCreateVoterId();
@@ -119,7 +132,7 @@ export async function POST(request: NextRequest) {
     .bind(matchId, playerId)
     .first<{ count: number; average: number }>()) ?? { count: 0, average: 0 };
 
-  return NextResponse.json({
+  return json({
     matchId,
     playerId,
     yourScore: score,
