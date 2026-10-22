@@ -3,8 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getGame } from "@/lib/games";
 import { getTeam, getTeamMatches } from "@/lib/pandascore";
+import { markUnavailable } from "@/lib/unavailable-flag";
 import MatchSection from "@/components/MatchSection";
 import TeamFollowButton from "@/components/TeamFollowButton";
+import UpstreamUnavailable from "@/components/UpstreamUnavailable";
 
 interface Props {
   params: Promise<{ game: string; id: string }>;
@@ -12,7 +14,8 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { game, id } = await params;
-  const team = await getTeam(Number(id));
+  const result = await getTeam(Number(id));
+  const team = result.kind === "ok" ? result.data : null;
   return {
     title: team ? `${team.name} — eMATCH BOARD` : "Team — eMATCH BOARD",
     alternates: { canonical: `/${game}/team/${id}` },
@@ -25,11 +28,16 @@ export default async function TeamPage({ params }: Props) {
   const id = Number(idParam);
   if (!config || !Number.isFinite(id)) notFound();
 
-  const [team, teamMatches] = await Promise.all([
+  const [teamResult, teamMatches] = await Promise.all([
     getTeam(id),
     getTeamMatches(id),
   ]);
-  if (!team) notFound();
+  if (teamResult.kind === "not_found") notFound();
+  if (teamResult.kind === "unavailable") {
+    await markUnavailable(`/${config.slug}/team/${id}`);
+    return <UpstreamUnavailable />;
+  }
+  const team = teamResult.data;
 
   return (
     <div className="flex flex-col gap-4">

@@ -10,11 +10,13 @@ import {
 import { getStartggMatch } from "@/lib/startgg";
 import type { Match, MatchDetail, Team, TeamDetail } from "@/lib/types";
 import { jsonLdString } from "@/lib/seo";
+import { markUnavailable } from "@/lib/unavailable-flag";
 import { WORLDS_SERIE_ID } from "@/lib/worlds";
 import LocalTime from "@/components/LocalTime";
 import MatchLineups from "@/components/MatchLineups";
 import MatchRow from "@/components/MatchCard";
 import PlayerRatingWidget from "@/components/PlayerRatingWidget";
+import UpstreamUnavailable from "@/components/UpstreamUnavailable";
 
 // 試合詳細ページ。
 // 試合前: 両チームのロスター・直近フォーム・過去の対戦成績(H2H)
@@ -30,8 +32,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const config = getGame(game);
   const match =
     config?.liveSource === "startgg"
-      ? (await getStartggMatch(Number(id)))?.match ?? null
-      : await getMatch(Number(id));
+      ? ((await getStartggMatch(Number(id)))?.match ?? null)
+      : await getMatch(Number(id)).then((r) => (r.kind === "ok" ? r.data : null));
   const a = match?.opponents[0]?.opponent?.name ?? "TBD";
   const b = match?.opponents[1]?.opponent?.name ?? "TBD";
   return {
@@ -112,16 +114,25 @@ export default async function MatchPage({ params }: Props) {
     teamA = result.teamA;
     teamB = result.teamB;
   } else {
-    match = await getMatch(id);
-    if (!match) notFound();
+    const matchResult = await getMatch(id);
+    if (matchResult.kind === "not_found") notFound();
+    if (matchResult.kind === "unavailable") {
+      await markUnavailable(`/${config.slug}/match/${id}`);
+      return <UpstreamUnavailable />;
+    }
+    match = matchResult.data;
     const refA = match.opponents[0]?.opponent ?? null;
     const refB = match.opponents[1]?.opponent ?? null;
-    [teamA, teamB, recentA, recentB] = await Promise.all([
+    const [teamAResult, teamBResult, recentAResult, recentBResult] = await Promise.all([
       refA ? getTeam(refA.id) : Promise.resolve(null),
       refB ? getTeam(refB.id) : Promise.resolve(null),
       refA ? getTeamRecentMatches(refA.id) : Promise.resolve([]),
       refB ? getTeamRecentMatches(refB.id) : Promise.resolve([]),
     ]);
+    teamA = teamAResult?.kind === "ok" ? teamAResult.data : null;
+    teamB = teamBResult?.kind === "ok" ? teamBResult.data : null;
+    recentA = recentAResult;
+    recentB = recentBResult;
   }
 
   const teamARef = match.opponents[0]?.opponent ?? null;

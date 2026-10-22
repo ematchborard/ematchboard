@@ -32,6 +32,30 @@ export function hasApiToken(): boolean {
   return Boolean(process.env.PANDASCORE_TOKEN);
 }
 
+// 上流のHTTPステータスを保持するエラー。404(本当に存在しない)と429/5xx等
+// (一時的な障害)を呼び出し側で区別するために使う — 後者をnotFound()にしてしまうと
+// Googlebotが「ページが消えた」と判断してインデックスから外してしまうため
+// (2026-10-22、枠切れ中に試合/チーム/大会ページが軒並み404化する不具合への対応)
+export class PandaScoreError extends Error {
+  status: number;
+  constructor(status: number, path: string) {
+    super(`PandaScore error ${status} for ${path}`);
+    this.status = status;
+  }
+}
+
+// 単発リソース取得(試合/チーム/大会の詳細)の結果。not_found = 上流が本当に404、
+// unavailable = 一時的な取得失敗(キャッシュも無い)。両者を呼び出し側(ページ)で
+// 区別し、not_foundだけ本物の404を返す
+export type SingleFetchResult<T> =
+  | { kind: "ok"; data: T }
+  | { kind: "not_found" }
+  | { kind: "unavailable" };
+
+function classifyFailure(err: unknown): "not_found" | "unavailable" {
+  return err instanceof PandaScoreError && err.status === 404 ? "not_found" : "unavailable";
+}
+
 // 3層キャッシュ戦略(無料枠1,000req/時を守る生命線):
 //  1. プロセス内メモリ(5分) — 同一インスタンス内の連続アクセス用
 //  2. Cloudflare KV(5分) — 拠点をまたいで共有される(KVの由来)。
@@ -144,7 +168,7 @@ const fetchByUrl = cache(async (url: string, path: string): Promise<unknown> => 
   if (!res.ok) {
     const stale = await readStale<unknown>(kv, staleKey, hit);
     if (stale !== null) return stale;
-    throw new Error(`PandaScore error ${res.status} for ${path}`);
+    throw new PandaScoreError(res.status, path);
   }
   const data: unknown = await res.json();
   const raw = JSON.stringify(data);
@@ -216,12 +240,15 @@ export async function getMatches(
   return all;
 }
 
-export async function getTournament(id: number): Promise<Tournament | null> {
-  if (!hasApiToken()) return mockTournament(id);
+export async function getTournament(id: number): Promise<SingleFetchResult<Tournament>> {
+  if (!hasApiToken()) {
+    const mock = mockTournament(id);
+    return mock ? { kind: "ok", data: mock } : { kind: "not_found" };
+  }
   try {
-    return await psFetch<Tournament>(`/tournaments/${id}`);
-  } catch {
-    return null;
+    return { kind: "ok", data: await psFetch<Tournament>(`/tournaments/${id}`) };
+  } catch (err) {
+    return { kind: classifyFailure(err) };
   }
 }
 
@@ -279,14 +306,17 @@ const finishedMatchCacheKey = (id: number) => `match-detail-finished:${id}`;
 // 終了済み試合はpsFetchの通常キャッシュ(5分)より長い専用キャッシュを先に見る。
 // ボットが古い試合詳細ページを繰り返し巡回してくるケースで、2回目以降は
 // PandaScoreに一切問い合わせずに返せるようにするため(2026-10-21対応)
-export async function getMatch(id: number): Promise<MatchDetail | null> {
-  if (!hasApiToken()) return mockMatchDetail(id);
+export async function getMatch(id: number): Promise<SingleFetchResult<MatchDetail>> {
+  if (!hasApiToken()) {
+    const mock = mockMatchDetail(id);
+    return mock ? { kind: "ok", data: mock } : { kind: "not_found" };
+  }
 
   const kv = await kvCache();
   if (kv) {
     try {
       const cached = await kv.get<MatchDetail>(finishedMatchCacheKey(id), "json");
-      if (cached) return cached;
+      if (cached) return { kind: "ok", data: cached };
     } catch {
       // 無視して通常取得へ
     }
@@ -303,9 +333,9 @@ export async function getMatch(id: number): Promise<MatchDetail | null> {
         // キャッシュ保存失敗は無視
       }
     }
-    return match;
-  } catch {
-    return null;
+    return { kind: "ok", data: match };
+  } catch (err) {
+    return { kind: classifyFailure(err) };
   }
 }
 
@@ -384,12 +414,15 @@ export async function getTournamentBrackets(
   }
 }
 
-export async function getTeam(id: number): Promise<TeamDetail | null> {
-  if (!hasApiToken()) return mockTeam(id);
+export async function getTeam(id: number): Promise<SingleFetchResult<TeamDetail>> {
+  if (!hasApiToken()) {
+    const mock = mockTeam(id);
+    return mock ? { kind: "ok", data: mock } : { kind: "not_found" };
+  }
   try {
-    return await psFetch<TeamDetail>(`/teams/${id}`);
-  } catch {
-    return null;
+    return { kind: "ok", data: await psFetch<TeamDetail>(`/teams/${id}`) };
+  } catch (err) {
+    return { kind: classifyFailure(err) };
   }
 }
 

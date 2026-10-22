@@ -10,6 +10,7 @@ import {
   getTournamentMatches,
   getTournamentStandings,
 } from "@/lib/pandascore";
+import { markUnavailable } from "@/lib/unavailable-flag";
 import { WORLDS_GROUP_STAGE_ID } from "@/lib/worlds";
 import BracketView from "@/components/BracketView";
 import StageProgressBar from "@/components/StageProgressBar";
@@ -20,6 +21,7 @@ import TournamentTabs, {
   type TournamentTab,
 } from "@/components/TournamentTabs";
 import TournamentTeams from "@/components/TournamentTeams";
+import UpstreamUnavailable from "@/components/UpstreamUnavailable";
 
 interface Props {
   params: Promise<{ game: string; id: string }>;
@@ -41,7 +43,8 @@ function tournamentTitle(
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { game, id } = await params;
-  const tournament = await getTournament(Number(id));
+  const result = await getTournament(Number(id));
+  const tournament = result.kind === "ok" ? result.data : null;
   if (!tournament) return { title: "Tournament — eMATCH BOARD" };
 
   const title = tournamentTitle(
@@ -72,8 +75,13 @@ export default async function TournamentPage({ params, searchParams }: Props) {
   const id = Number(idParam);
   if (!config || !Number.isFinite(id)) notFound();
 
-  const tournament = await getTournament(id);
-  if (!tournament) notFound();
+  const tournamentResult = await getTournament(id);
+  if (tournamentResult.kind === "not_found") notFound();
+  if (tournamentResult.kind === "unavailable") {
+    await markUnavailable(`/${config.slug}/tournament/${id}`);
+    return <UpstreamUnavailable />;
+  }
+  const tournament = tournamentResult.data;
   const [matches, standings, brackets, siblingStages] = await Promise.all([
     getTournamentMatches(id),
     getTournamentStandings(id),
