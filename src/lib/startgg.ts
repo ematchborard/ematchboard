@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { cache } from "react";
+import { edgeCacheGet, edgeCachePut } from "./edge-cache";
 import type {
   Match,
   MatchDetail,
@@ -84,40 +84,19 @@ function stableId(label: string): number {
 
 // 3層キャッシュ戦略(PandaScoreと同じ設計。start.ggのレート制限は
 // 80req/60秒とPandaScoreよりタイトなので、キャッシュの意義がより大きい)。
-// エッジキャッシュはCloudflare KVを使う(拠点をまたいで共有されるため。
-// 以前はcaches.defaultだったが拠点ごとに別物でグローバル共有ではなく、
-// 海外アクセスでキャッシュが温まってない拠点が上流失敗を即座に空表示に
-// してしまう不具合があった。詳細はpandascore.tsのコメント参照)
-const memCache = new Map<string, { expires: number; data: unknown; raw: string; lastKvWrite: number }>();
+// エッジキャッシュはCloudflare Cache API(caches.default)を使う。2026-10-22、
+// 終わった試合ページへのボット巡回でKVの書き込み上限(1,000回/日)を使い切り
+// Cronのスナップショット更新まで共倒れした不具合を受けて、KVからこちらへ
+// 移した(詳細はlib/edge-cache.ts・pandascore.tsのコメント参照。KVは以後
+// Cronのスナップショット専用)
+const memCache = new Map<string, { expires: number; data: unknown; raw: string }>();
 const MEM_TTL_MS = 5 * 60_000;
-const KV_TTL_SEC = 300;
-const STALE_TTL_SEC = 24 * 60 * 60; // 上流障害時の最終手段。詳細はpandascore.tsのコメント参照
-const MIN_KV_WRITE_INTERVAL_MS = 4 * 60_000;
+const EDGE_TTL_SEC = 300;
+const STALE_TTL_SEC = 24 * 60 * 60; // 上流障害時の最終手段。詳細はedge-cache.tsのコメント参照
 
-async function kvCache(): Promise<KVNamespace | undefined> {
-  try {
-    const { env } = await getCloudflareContext({ async: true });
-    return (env as { MATCH_CACHE?: KVNamespace }).MATCH_CACHE;
-  } catch {
-    return undefined;
-  }
-}
-
-async function readStale<T>(
-  kv: KVNamespace | undefined,
-  staleKey: string,
-  hit: { data: unknown } | undefined
-): Promise<T | null> {
+async function readStale<T>(staleKey: string, hit: { data: unknown } | undefined): Promise<T | null> {
   if (hit) return hit.data as T;
-  if (kv) {
-    try {
-      const stale = await kv.get<T>(staleKey, "json");
-      if (stale !== null) return stale;
-    } catch {
-      // 無視
-    }
-  }
-  return null;
+  return edgeCacheGet<T>(staleKey);
 }
 
 // KVのキー長上限(512バイト)に収まるよう、クエリ+変数をハッシュ化する
@@ -141,7 +120,8 @@ async function sgQuery<T>(
 ): Promise<T | null> {
   const variablesJson = JSON.stringify(variables);
   const rawKey = `${variablesJson}::${query.replace(/\s+/g, " ").trim()}`;
-  const cacheKey = `sg:${hashKey(rawKey)}`;
+  // Cache APIのキーはURL形状である必要があるため、疑似URLに包む
+  const cacheKey = `https://edge-cache.internal/startgg/${hashKey(rawKey)}`;
   return fetchByKey(cacheKey, query, variablesJson) as Promise<T | null>;
 }
 
@@ -156,22 +136,10 @@ const fetchByKey = cache(
     const hit = memCache.get(cacheKey);
     if (hit && hit.expires > Date.now()) return hit.data;
 
-    const kv = await kvCache();
-    if (kv) {
-      try {
-        const cached = await kv.get<unknown>(cacheKey, "json");
-        if (cached !== null) {
-          memCache.set(cacheKey, {
-            expires: Date.now() + MEM_TTL_MS,
-            data: cached,
-            raw: JSON.stringify(cached),
-            lastKvWrite: hit?.lastKvWrite ?? Date.now(),
-          });
-          return cached;
-        }
-      } catch {
-        // KV読み取り失敗は無視して上流へ
-      }
+    const cached = await edgeCacheGet<unknown>(cacheKey);
+    if (cached !== null) {
+      memCache.set(cacheKey, { expires: Date.now() + MEM_TTL_MS, data: cached, raw: JSON.stringify(cached) });
+      return cached;
     }
 
     let res: Response;
@@ -186,47 +154,36 @@ const fetchByKey = cache(
         next: { revalidate: 300 },
       });
     } catch {
-      return readStale<unknown>(kv, staleKey, hit);
+      return readStale<unknown>(staleKey, hit);
     }
 
     console.log(
       `[startgg] ${res.status} remaining=${res.headers.get("x-ratelimit-remaining") ?? "?"}`
     );
 
-    if (!res.ok) return readStale<unknown>(kv, staleKey, hit);
+    if (!res.ok) return readStale<unknown>(staleKey, hit);
 
     const json = (await res.json()) as {
       data: unknown;
       errors?: { message: string }[];
     };
     if (json.errors && json.errors.length > 0) {
-      return readStale<unknown>(kv, staleKey, hit);
+      return readStale<unknown>(staleKey, hit);
     }
     const data = json.data;
     const raw = JSON.stringify(data);
 
-    memCache.set(cacheKey, { expires: Date.now() + MEM_TTL_MS, data, raw, lastKvWrite: hit?.lastKvWrite ?? 0 });
+    memCache.set(cacheKey, { expires: Date.now() + MEM_TTL_MS, data, raw });
     if (memCache.size > 200) {
       for (const [k, v] of memCache) {
         if (v.expires < Date.now()) memCache.delete(k);
       }
     }
-    if (kv) {
-      const unchanged = hit?.raw === raw;
-      const recentlyWritten = Date.now() - (hit?.lastKvWrite ?? 0) < MIN_KV_WRITE_INTERVAL_MS;
-      if (!(unchanged && recentlyWritten)) {
-        try {
-          await Promise.all([
-            kv.put(cacheKey, raw, { expirationTtl: KV_TTL_SEC }),
-            kv.put(staleKey, raw, { expirationTtl: STALE_TTL_SEC }),
-          ]);
-          const entry = memCache.get(cacheKey);
-          if (entry) entry.lastKvWrite = Date.now();
-        } catch {
-          // キャッシュ保存失敗は無視
-        }
-      }
-    }
+
+    await Promise.all([
+      edgeCachePut(cacheKey, raw, EDGE_TTL_SEC),
+      edgeCachePut(staleKey, raw, STALE_TTL_SEC),
+    ]);
     return data;
   }
 );

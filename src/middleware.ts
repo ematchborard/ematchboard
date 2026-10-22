@@ -1,13 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { kvCache } from "@/lib/pandascore";
+import { isMarkedUnavailable } from "@/lib/unavailable-flag";
 
 // PandaScore障害時、試合/チーム/大会ページがnotFound()で404を返すとGooglebotが
 // 「ページが消えた」と判断してインデックスから外してしまう。各ページは失敗時に
-// unavailable:${pathname} というKVキーを10分TTLで立てる(lib/unavailable-flag.ts)。
-// ここではそのフラグだけを見て、立っていれば503+Retry-Afterを即返す
-// (ページのレンダリングもPandaScoreへの再フェッチも発生しない)。これにより、
-// Googlebotが同じ古いページを短時間に何度も巡回してきても2回目以降は
-// PandaScoreに一切負荷をかけない(2026-10-22、枠切れの主因と判明したボット巡回への対応)。
+// lib/unavailable-flag.tsでCache APIにフラグを10分立てる。ここではそのフラグ
+// だけを見て、立っていれば503+Retry-Afterを即返す(ページのレンダリングも
+// PandaScoreへの再フェッチも発生しない)。これにより、Googlebotが同じ古い
+// ページを短時間に何度も巡回してきても2回目以降はPandaScoreに一切負荷を
+// かけない(2026-10-22、枠切れの主因と判明したボット巡回への対応)。
 // 初回アクセス(フラグがまだ無い)はページ側が通常どおり処理する。
 //
 // 終了済み試合ページへのCDNエッジキャッシュは別途middlewareでCache-Controlを
@@ -24,15 +24,7 @@ export const config = {
 const RETRY_AFTER_SECONDS = 600;
 
 export async function middleware(request: NextRequest) {
-  const kv = await kvCache();
-  if (!kv) return NextResponse.next();
-
-  let flagged: string | null = null;
-  try {
-    flagged = await kv.get(`unavailable:${request.nextUrl.pathname}`);
-  } catch {
-    return NextResponse.next();
-  }
+  const flagged = await isMarkedUnavailable(request.nextUrl.pathname);
   if (!flagged) return NextResponse.next();
 
   return new Response(

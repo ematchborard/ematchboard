@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { cache } from "react";
+import { edgeCacheGet, edgeCachePut } from "./edge-cache";
 import type {
   BracketMatch,
   Match,
@@ -58,25 +59,25 @@ function classifyFailure(err: unknown): "not_found" | "unavailable" {
 
 // 3層キャッシュ戦略(無料枠1,000req/時を守る生命線):
 //  1. プロセス内メモリ(5分) — 同一インスタンス内の連続アクセス用
-//  2. Cloudflare KV(5分) — 拠点をまたいで共有される(KVの由来)。
-//     以前はcaches.default(Cache API)を使っていたが、これは**拠点ごとに別物**で
-//     グローバル共有ではないため、アクセスの少ない拠点(海外等)は毎回キャッシュが
-//     空の状態から上流に生アクセスし、そこで失敗すると救えず空表示になっていた
-//     (2026-10-11、海外アクセスで試合0件になる不具合として発覚)。KVは拠点間で
-//     数十秒程度のラグはあるが共有されるため、この問題を構造的に解消する。
+//  2. Cloudflare Cache API(caches.default、5分) — 拠点ごとに別物だが、KVと違い
+//     書き込み回数の上限が無い。個々の試合/チーム/大会詳細のような単発リソースは
+//     拠点ごとにキャッシュがばらけても、その拠点だけが軽く再フェッチするだけで
+//     自己修復するため実害が小さい(「今日の全ゲーム分」のような集約データとは
+//     性質が違う — そちらは引き続きKVのスナップショットを使う。lib/today-snapshot.ts
+//     ・lib/worlds-snapshot.ts参照)。
+//     2026-10-22、終わった試合ページへのGooglebotの巡回でKVの書き込み上限
+//     (1,000回/日)を使い切り、Cronのスナップショット更新まで共倒れした不具合を
+//     受けて、この層をKVからCache APIに戻した(KVは以後Cron専用)。
 //  3. 上流が429等で失敗したら、まずプロセス内の期限切れキャッシュ、無ければ
-//     KVの「古いデータでも可」バックアップ(stale:プレフィックス、TTL24時間)を返す。
-//     プロセス内メモリはWorkersのisolateごとに別物で当てにならないため
-//     (コールドスタートだと毎回空)、isoateをまたいで共有されるKV側のバックアップが
-//     本命。これで上流が長時間落ちても空表示にはならない
-//     (2026-10-21、/api/todayが断続的に空/一部ゲーム欠けになる不具合として発覚)。
-const memCache = new Map<string, { expires: number; data: unknown; raw: string; lastKvWrite: number }>();
+//     Cache APIの「古いデータでも可」バックアップ(stale:プレフィックス、TTL24時間)
+//     を返す。これで上流が長時間落ちても空表示にはならない。
+const memCache = new Map<string, { expires: number; data: unknown; raw: string }>();
 const MEM_TTL_MS = 5 * 60_000;
-const KV_TTL_SEC = 300;
+const EDGE_TTL_SEC = 300;
 const STALE_TTL_SEC = 24 * 60 * 60; // 上流障害時の最終手段。24時間は古くても空よりマシ
-const MIN_KV_WRITE_INTERVAL_MS = 4 * 60_000; // KV書き込みは無料枠(1,000回/日)を守るため5分に1回程度に抑える
 
-// today-snapshot.tsがCronの書いたスナップショットを読むのにも使う共通アクセサ
+// today-snapshot.ts/worlds-snapshot.tsがCronのスナップショットを読み書きするのに
+// 使う共通アクセサ。この層(fetchByUrl)自体はもうKVを使わない
 export async function kvCache(): Promise<KVNamespace | undefined> {
   try {
     const { env } = await getCloudflareContext({ async: true });
@@ -88,22 +89,10 @@ export async function kvCache(): Promise<KVNamespace | undefined> {
 }
 
 // 上流フェッチが失敗したときの最終手段。プロセス内の期限切れキャッシュ(速いが
-// isolateローカル)→ KVの古いデータバックアップ(遅いがisolateをまたいで共有)の順
-async function readStale<T>(
-  kv: KVNamespace | undefined,
-  staleKey: string,
-  hit: { data: unknown } | undefined
-): Promise<T | null> {
+// isolateローカル)→ Cache APIの古いデータバックアップの順
+async function readStale<T>(staleKey: string, hit: { data: unknown } | undefined): Promise<T | null> {
   if (hit) return hit.data as T;
-  if (kv) {
-    try {
-      const stale = await kv.get<T>(staleKey, "json");
-      if (stale !== null) return stale;
-    } catch {
-      // 無視
-    }
-  }
-  return null;
+  return edgeCacheGet<T>(staleKey);
 }
 
 function psFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
@@ -126,23 +115,11 @@ const fetchByUrl = cache(async (url: string, path: string): Promise<unknown> => 
   const hit = memCache.get(url);
   if (hit && hit.expires > Date.now()) return hit.data;
 
-  // KVキャッシュ(URLのみがキーで、トークンは含まれないので安全)
-  const kv = await kvCache();
-  if (kv) {
-    try {
-      const cached = await kv.get<unknown>(url, "json");
-      if (cached !== null) {
-        memCache.set(url, {
-          expires: Date.now() + MEM_TTL_MS,
-          data: cached,
-          raw: JSON.stringify(cached),
-          lastKvWrite: hit?.lastKvWrite ?? Date.now(),
-        });
-        return cached;
-      }
-    } catch {
-      // KV読み取り失敗は無視して上流へ
-    }
+  // Cache API(拠点ローカル、書き込み上限なし)
+  const cached = await edgeCacheGet<unknown>(url);
+  if (cached !== null) {
+    memCache.set(url, { expires: Date.now() + MEM_TTL_MS, data: cached, raw: JSON.stringify(cached) });
+    return cached;
   }
 
   let res: Response;
@@ -156,7 +133,7 @@ const fetchByUrl = cache(async (url: string, path: string): Promise<unknown> => 
       next: { revalidate: 300 },
     });
   } catch (err) {
-    const stale = await readStale<unknown>(kv, staleKey, hit);
+    const stale = await readStale<unknown>(staleKey, hit);
     if (stale !== null) return stale;
     throw err;
   }
@@ -166,38 +143,25 @@ const fetchByUrl = cache(async (url: string, path: string): Promise<unknown> => 
   );
 
   if (!res.ok) {
-    const stale = await readStale<unknown>(kv, staleKey, hit);
+    const stale = await readStale<unknown>(staleKey, hit);
     if (stale !== null) return stale;
     throw new PandaScoreError(res.status, path);
   }
   const data: unknown = await res.json();
   const raw = JSON.stringify(data);
 
-  memCache.set(url, { expires: Date.now() + MEM_TTL_MS, data, raw, lastKvWrite: hit?.lastKvWrite ?? 0 });
+  memCache.set(url, { expires: Date.now() + MEM_TTL_MS, data, raw });
   if (memCache.size > 500) {
     for (const [k, v] of memCache) {
       if (v.expires < Date.now()) memCache.delete(k);
     }
   }
 
-  if (kv) {
-    // 内容が前回と同じで、かつ最近書き込み済みなら書き込みをスキップ
-    // (無料枠1,000回/日を守るため。内容が変わっていれば間隔を無視して書く)
-    const unchanged = hit?.raw === raw;
-    const recentlyWritten = Date.now() - (hit?.lastKvWrite ?? 0) < MIN_KV_WRITE_INTERVAL_MS;
-    if (!(unchanged && recentlyWritten)) {
-      try {
-        await Promise.all([
-          kv.put(url, raw, { expirationTtl: KV_TTL_SEC }),
-          kv.put(staleKey, raw, { expirationTtl: STALE_TTL_SEC }),
-        ]);
-        const entry = memCache.get(url);
-        if (entry) entry.lastKvWrite = Date.now();
-      } catch {
-        // キャッシュ保存失敗は無視(次回また上流から取る)
-      }
-    }
-  }
+  // Cache APIは書き込み回数の上限が無いので、KVのような間引きは不要
+  await Promise.all([
+    edgeCachePut(url, raw, EDGE_TTL_SEC),
+    edgeCachePut(staleKey, raw, STALE_TTL_SEC),
+  ]);
   return data;
 });
 
@@ -301,37 +265,27 @@ export async function getTournamentStandings(
 
 // 試合詳細 (マップごとの結果を含む)
 const FINISHED_MATCH_TTL_SEC = 7 * 24 * 60 * 60; // 終了済み試合は結果が変わらないので長めに
-const finishedMatchCacheKey = (id: number) => `match-detail-finished:${id}`;
+// Cache APIのキーはURL形状である必要があるため、実在しない内部用ホストを使う
+// (実際にネットワークへは出ない。あくまでキャッシュのキーとしてのみ使用)
+const finishedMatchCacheKey = (id: number) => `https://edge-cache.internal/match-detail-finished/${id}`;
 
 // 終了済み試合はpsFetchの通常キャッシュ(5分)より長い専用キャッシュを先に見る。
 // ボットが古い試合詳細ページを繰り返し巡回してくるケースで、2回目以降は
-// PandaScoreに一切問い合わせずに返せるようにするため(2026-10-21対応)
+// PandaScoreに一切問い合わせずに返せるようにするため(2026-10-21対応。
+// 2026-10-22、KVの書き込み上限を守るためCache APIへ移行)
 export async function getMatch(id: number): Promise<SingleFetchResult<MatchDetail>> {
   if (!hasApiToken()) {
     const mock = mockMatchDetail(id);
     return mock ? { kind: "ok", data: mock } : { kind: "not_found" };
   }
 
-  const kv = await kvCache();
-  if (kv) {
-    try {
-      const cached = await kv.get<MatchDetail>(finishedMatchCacheKey(id), "json");
-      if (cached) return { kind: "ok", data: cached };
-    } catch {
-      // 無視して通常取得へ
-    }
-  }
+  const cached = await edgeCacheGet<MatchDetail>(finishedMatchCacheKey(id));
+  if (cached) return { kind: "ok", data: cached };
 
   try {
     const match = await psFetch<MatchDetail>(`/matches/${id}`);
-    if (match.status === "finished" && kv) {
-      try {
-        await kv.put(finishedMatchCacheKey(id), JSON.stringify(match), {
-          expirationTtl: FINISHED_MATCH_TTL_SEC,
-        });
-      } catch {
-        // キャッシュ保存失敗は無視
-      }
+    if (match.status === "finished") {
+      await edgeCachePut(finishedMatchCacheKey(id), JSON.stringify(match), FINISHED_MATCH_TTL_SEC);
     }
     return { kind: "ok", data: match };
   } catch (err) {
