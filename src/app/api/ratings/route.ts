@@ -48,12 +48,18 @@ export async function GET(request: NextRequest) {
     return json({ error: "ratings database unavailable" }, { status: 503 });
   }
 
-  const { results } = await db
-    .prepare(
-      "SELECT player_id, COUNT(*) as count, AVG(score) as average FROM ratings WHERE match_id = ? GROUP BY player_id"
-    )
-    .bind(matchId)
-    .all<{ player_id: number; count: number; average: number }>();
+  const [{ results }, totalVotersRow] = await Promise.all([
+    db
+      .prepare(
+        "SELECT player_id, COUNT(*) as count, AVG(score) as average FROM ratings WHERE match_id = ? GROUP BY player_id"
+      )
+      .bind(matchId)
+      .all<{ player_id: number; count: number; average: number }>(),
+    db
+      .prepare("SELECT COUNT(DISTINCT voter_hash) as count FROM ratings WHERE match_id = ?")
+      .bind(matchId)
+      .first<{ count: number }>(),
+  ]);
 
   const players = results.map((r) => ({
     playerId: r.player_id,
@@ -72,7 +78,7 @@ export async function GET(request: NextRequest) {
     yourVotes = Object.fromEntries(own.map((r) => [r.player_id, r.score]));
   }
 
-  return json({ matchId, players, yourVotes });
+  return json({ matchId, players, yourVotes, totalVoters: totalVotersRow?.count ?? 0 });
 }
 
 export async function POST(request: NextRequest) {

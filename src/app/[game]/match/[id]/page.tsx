@@ -391,6 +391,9 @@ export default async function MatchPage({ params }: Props) {
         <PlayerRatingWidget
           matchId={match.id}
           isFinished={match.status === "finished"}
+          beginAt={match.begin_at}
+          teamAName={teamARef?.name ?? "Team A"}
+          teamBName={teamBRef?.name ?? "Team B"}
           teamAPlayers={selectStartingFive(teamA?.players ?? [], ROSTER_OVERRIDES[match.id]?.teamAIds)}
           teamBPlayers={selectStartingFive(teamB?.players ?? [], ROSTER_OVERRIDES[match.id]?.teamBIds)}
         />

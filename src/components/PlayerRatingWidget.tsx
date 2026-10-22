@@ -1,18 +1,22 @@
 "use client";
 
 import Script from "next/script";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { roleLabelOf } from "@/lib/lol-roles";
 import type { Player } from "@/lib/types";
 
-// ファン採点(デプロイ1): 試合終了後だけ受け付ける・控えを除いた5人のみ表示・
-// Turnstileは普段は幅0で隠し、投票(execute)の間だけ見せる(Cloudflareが
-// 実際にチャレンジを出した場合だけその場に表示される)。
-// カード型UI(2カラム・案内バー・ファン選出MVP等)はデプロイ2で別途対応する。
-// ロスターは試合ページが既に取得しているTeamDetail.playersから選んだ5人を
-// そのまま使う(Worlds限定機能なので追加のPandaScore呼び出しは発生しない)。
+// ファン採点(デプロイ2): カード型UI。
+// - 案内バー(受付中・注意書き・ファン選出MVP)
+// - 2カラム(チームA=赤 / チームB=青)、モバイルはタブ切り替え
+// - カードをタップすると1〜10の数字がその場で開く(タップ1回で投票)
+// 平均点・自分の投票はページ表示後に/api/ratingsから取得する
+// (試合ページは終了後7日間フルページキャッシュされるため、HTMLには埋め込まない)。
+// コメント機能・Xシェアはステップ4/5で追加する。
 
 const TURNSTILE_SITE_KEY = "0x4AAAAAAFfz_mUUYY0c7nF_";
 const SCORES = Array.from({ length: 10 }, (_, i) => i + 1);
+const VOTING_WINDOW_DAYS = 7;
+const MVP_MIN_VOTES = 10;
 
 declare global {
   interface Window {
@@ -33,6 +37,7 @@ interface PlayerStat {
 interface RatingsGetResponse {
   players: { playerId: number; count: number; average: number }[];
   yourVotes: Record<string, number>;
+  totalVoters: number;
 }
 
 interface RatingsPostResponse {
@@ -42,6 +47,14 @@ interface RatingsPostResponse {
   error?: string;
 }
 
+type Accent = "red" | "blue";
+
+function daysRemaining(beginAt: string | null): number {
+  if (!beginAt) return VOTING_WINDOW_DAYS;
+  const elapsedDays = (new Date().getTime() - Date.parse(beginAt)) / (24 * 60 * 60 * 1000);
+  return Math.max(0, Math.ceil(VOTING_WINDOW_DAYS - elapsedDays));
+}
+
 function PlayerAvatar({ player }: { player: Player }) {
   if (player.image_url) {
     // eslint-disable-next-line @next/next/no-img-element -- 外部CDNの選手写真
@@ -49,30 +62,163 @@ function PlayerAvatar({ player }: { player: Player }) {
       <img
         src={player.image_url}
         alt=""
-        className="h-8 w-8 shrink-0 rounded-full bg-surface-hover object-cover"
+        className="h-9 w-9 shrink-0 rounded-full bg-surface-hover object-cover"
       />
     );
   }
   return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-hover text-[10px] font-bold text-muted">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-hover text-[10px] font-bold text-muted">
       {player.name.slice(0, 2).toUpperCase()}
     </span>
+  );
+}
+
+function PlayerCard({
+  player,
+  stat,
+  accent,
+  expanded,
+  pending,
+  onToggle,
+  onVote,
+}: {
+  player: Player;
+  stat: PlayerStat | undefined;
+  accent: Accent;
+  expanded: boolean;
+  pending: boolean;
+  onToggle: () => void;
+  onVote: (score: number) => void;
+}) {
+  const accentText = accent === "red" ? "text-live" : "text-blue-500";
+  const accentBg = accent === "red" ? "bg-live text-white" : "bg-blue-500 text-white";
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-hover"
+      >
+        <PlayerAvatar player={player} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{player.name}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+            {roleLabelOf(player.role) ?? ""}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className={`text-lg font-bold tabular-nums ${accentText}`}>
+            {stat && stat.count > 0 ? stat.average.toFixed(1) : "-"}
+          </p>
+          <p className="text-[10px] text-muted">{stat?.count ?? 0}人</p>
+        </div>
+      </button>
+      {expanded && (
+        <div className="border-t border-border-subtle px-3 py-2.5">
+          <div className="grid grid-cols-5 gap-1.5">
+            {SCORES.map((n) => (
+              <button
+                key={n}
+                type="button"
+                disabled={pending}
+                onClick={() => onVote(n)}
+                className={`flex h-10 min-w-10 items-center justify-center rounded-lg text-sm font-bold transition-colors disabled:opacity-50 ${
+                  stat?.yourScore === n
+                    ? accentBg
+                    : "bg-surface-hover text-foreground hover:bg-border-subtle"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          {stat?.yourScore != null && (
+            <p className="mt-2 text-center text-xs text-muted">あなた {stat.yourScore}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TeamColumn({
+  teamName,
+  accent,
+  players,
+  stats,
+  expandedId,
+  pendingId,
+  onToggle,
+  onVote,
+  className,
+}: {
+  teamName: string;
+  accent: Accent;
+  players: Player[];
+  stats: Record<number, PlayerStat>;
+  expandedId: number | null;
+  pendingId: number | null;
+  onToggle: (playerId: number) => void;
+  onVote: (playerId: number, score: number) => void;
+  className?: string;
+}) {
+  const withVotes = players
+    .map((p) => stats[p.id])
+    .filter((s): s is PlayerStat => !!s && s.count > 0);
+  const teamAvg =
+    withVotes.length > 0 ? withVotes.reduce((sum, s) => sum + s.average, 0) / withVotes.length : null;
+
+  return (
+    <div className={className}>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="truncate text-sm font-bold">{teamName}</h3>
+        {teamAvg !== null && (
+          <span className={`shrink-0 text-sm font-bold tabular-nums ${accent === "red" ? "text-live" : "text-blue-500"}`}>
+            平均 {teamAvg.toFixed(1)}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-col gap-2">
+        {players.map((p) => (
+          <PlayerCard
+            key={p.id}
+            player={p}
+            stat={stats[p.id]}
+            accent={accent}
+            expanded={expandedId === p.id}
+            pending={pendingId === p.id}
+            onToggle={() => onToggle(p.id)}
+            onVote={(score) => onVote(p.id, score)}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
 export default function PlayerRatingWidget({
   matchId,
   isFinished,
+  beginAt,
+  teamAName,
+  teamBName,
   teamAPlayers,
   teamBPlayers,
 }: {
   matchId: number;
   isFinished: boolean;
+  beginAt: string | null;
+  teamAName: string;
+  teamBName: string;
   teamAPlayers: Player[];
   teamBPlayers: Player[];
 }) {
-  const players = [...teamAPlayers, ...teamBPlayers];
+  const allPlayers = useMemo(() => [...teamAPlayers, ...teamBPlayers], [teamAPlayers, teamBPlayers]);
   const [stats, setStats] = useState<Record<number, PlayerStat>>({});
+  const [totalVoters, setTotalVoters] = useState(0);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [activeTeam, setActiveTeam] = useState<"A" | "B">("A");
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [turnstileVisible, setTurnstileVisible] = useState(false);
@@ -96,6 +242,7 @@ export default function PlayerRatingWidget({
           next[id] = { ...(next[id] ?? { average: score, count: 1 }), yourScore: score };
         }
         setStats(next);
+        setTotalVoters(data.totalVoters);
       })
       .catch(() => {});
     return () => {
@@ -137,6 +284,7 @@ export default function PlayerRatingWidget({
     async (playerId: number, score: number) => {
       setError(null);
       setPendingId(playerId);
+      const hadVote = stats[playerId]?.yourScore != null;
       try {
         const token = await getToken();
         const res = await fetch("/api/ratings", {
@@ -150,6 +298,7 @@ export default function PlayerRatingWidget({
           ...prev,
           [playerId]: { average: body.average, count: body.count, yourScore: body.yourScore },
         }));
+        if (!hadVote) setTotalVoters((prev) => prev + 1);
       } catch (err) {
         setError(err instanceof Error ? err.message : "投票に失敗しました");
       } finally {
@@ -158,10 +307,10 @@ export default function PlayerRatingWidget({
         setPendingId(null);
       }
     },
-    [matchId, getToken]
+    [matchId, getToken, stats]
   );
 
-  if (players.length === 0) return null;
+  if (allPlayers.length === 0) return null;
 
   if (!isFinished) {
     return (
@@ -174,6 +323,16 @@ export default function PlayerRatingWidget({
     );
   }
 
+  const mvp = allPlayers
+    .map((p) => ({ player: p, stat: stats[p.id] }))
+    .filter((x): x is { player: Player; stat: PlayerStat } => !!x.stat && x.stat.count >= MVP_MIN_VOTES)
+    .sort((a, b) => b.stat.average - a.stat.average)[0];
+
+  const tabButtonClass = (active: boolean) =>
+    `flex-1 rounded-lg px-3 py-2 text-center text-sm font-semibold transition-colors ${
+      active ? "bg-surface text-foreground shadow-sm" : "text-muted"
+    }`;
+
   return (
     <section>
       <h2 className="mb-2 text-sm font-semibold">ファン採点</h2>
@@ -184,36 +343,57 @@ export default function PlayerRatingWidget({
       />
       <div ref={containerRef} className={turnstileVisible ? "mb-2" : "h-0 w-0 overflow-hidden"} />
       {error && <p className="mb-2 text-xs text-live">{error}</p>}
-      <div className="divide-y divide-border-subtle overflow-hidden rounded-xl border border-border-subtle bg-surface">
-        {players.map((p) => {
-          const stat = stats[p.id];
-          return (
-            <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
-              <PlayerAvatar player={p} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{p.name}</p>
-                <p className="text-xs text-muted">
-                  {stat && stat.count > 0 ? `${stat.average.toFixed(1)} (${stat.count}票)` : "まだ評価がありません"}
-                </p>
-              </div>
-              <select
-                value={stat?.yourScore ?? ""}
-                disabled={pendingId === p.id}
-                onChange={(e) => vote(p.id, Number(e.target.value))}
-                className="shrink-0 rounded-lg border border-border-subtle bg-surface px-2 py-1 text-sm disabled:opacity-50"
-              >
-                <option value="" disabled>
-                  評価する
-                </option>
-                {SCORES.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </div>
-          );
-        })}
+
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-live/30 bg-live/10 px-4 py-3">
+        <span className="shrink-0 rounded-full bg-live px-2 py-0.5 text-[10px] font-bold text-white">
+          受付中
+        </span>
+        <p className="min-w-0 flex-1 text-xs">
+          <span className="font-semibold">この試合の選手を採点しよう</span>
+          <span className="text-muted">
+            {" "}
+            ・ 10点満点 ・ 1人1回 ・ ログイン不要 ・ あと{daysRemaining(beginAt)}日 ・ {totalVoters}人が採点
+          </span>
+        </p>
+        {mvp && (
+          <span className="shrink-0 rounded-lg bg-surface px-2.5 py-1 text-xs font-semibold">
+            <span className="text-muted">ファン選出MVP</span> {mvp.player.name} {mvp.stat.average.toFixed(1)}
+          </span>
+        )}
+      </div>
+
+      <div className="mb-3 flex gap-1.5 rounded-xl bg-surface-hover p-1 md:hidden">
+        <button type="button" onClick={() => setActiveTeam("A")} className={tabButtonClass(activeTeam === "A")}>
+          {teamAName}
+        </button>
+        <button type="button" onClick={() => setActiveTeam("B")} className={tabButtonClass(activeTeam === "B")}>
+          {teamBName}
+        </button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <TeamColumn
+          teamName={teamAName}
+          accent="red"
+          players={teamAPlayers}
+          stats={stats}
+          expandedId={expandedId}
+          pendingId={pendingId}
+          onToggle={(id) => setExpandedId((prev) => (prev === id ? null : id))}
+          onVote={vote}
+          className={activeTeam === "A" ? "" : "hidden md:block"}
+        />
+        <TeamColumn
+          teamName={teamBName}
+          accent="blue"
+          players={teamBPlayers}
+          stats={stats}
+          expandedId={expandedId}
+          pendingId={pendingId}
+          onToggle={(id) => setExpandedId((prev) => (prev === id ? null : id))}
+          onVote={vote}
+          className={activeTeam === "B" ? "" : "hidden md:block"}
+        />
       </div>
     </section>
   );
