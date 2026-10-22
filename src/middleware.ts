@@ -18,15 +18,25 @@ const RETRY_AFTER_SECONDS = 600;
 
 export async function middleware(request: NextRequest) {
   const kv = await kvCache();
-  if (!kv) return NextResponse.next();
+  if (!kv) {
+    const res = NextResponse.next();
+    res.headers.set("x-unavail-debug", "no-kv");
+    return res;
+  }
 
   let flagged: string | null = null;
   try {
     flagged = await kv.get(`unavailable:${request.nextUrl.pathname}`);
-  } catch {
-    return NextResponse.next();
+  } catch (err) {
+    const res = NextResponse.next();
+    res.headers.set("x-unavail-debug", `kv-error:${String(err).slice(0, 80)}`);
+    return res;
   }
-  if (!flagged) return NextResponse.next();
+  if (!flagged) {
+    const res = NextResponse.next();
+    res.headers.set("x-unavail-debug", "no-flag");
+    return res;
+  }
 
   return new Response(
     "<!doctype html><html lang=\"ja\"><head><meta charset=\"utf-8\">" +
