@@ -26,6 +26,71 @@ interface Env {
   PANDASCORE_TOKEN?: string;
 }
 
+// 終了済み試合ページ(/[game]/match/[id])の200応答だけをCache APIに
+// キャッシュし、2回目以降はNext.jsのレンダリングを一切経由せずに返す。
+// 「終了済みか」の判定は、そのページが呼ぶgetMatch()(src/lib/pandascore.ts)が
+// 終了済み試合にだけ書く既存のCache APIキーをそのまま流用する(新しい
+// シグナルのやり取りを増やさない)。対象はステータス200のみで、
+// リダイレクト・エラー・503はキャッシュしない。
+// 2026-10-22、Googlebotの巡回がKVの書き込み上限(1,000回/日)を使い切り、
+// Cronのスナップショット更新まで共倒れした不具合を受けて導入。
+// このfetchハンドラの変更は過去に本番障害(www/httpリダイレクトの誤実装)を
+// 起こした箇所なので、ルーティング/リダイレクトには一切手を入れず、
+// 既存のhandler.fetchの前後に読み取り専用のキャッシュ判定を足すだけに
+// とどめている。
+const FINISHED_MATCH_PATH_RE = /^\/[^/]+\/match\/(\d+)$/;
+const FINISHED_MATCH_PAGE_TTL_SEC = 7 * 24 * 60 * 60;
+
+function finishedMatchDetailCacheKey(id: string): string {
+  return `https://edge-cache.internal/match-detail-finished/${id}`;
+}
+
+async function fetchWithFinishedMatchCache(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext
+): Promise<Response> {
+  if (request.method !== "GET") return handler.fetch(request, env, ctx);
+
+  const url = new URL(request.url);
+  const m = url.pathname.match(FINISHED_MATCH_PATH_RE);
+  if (!m) return handler.fetch(request, env, ctx);
+
+  const cache = (caches as unknown as { default: Cache }).default;
+
+  try {
+    const cachedPage = await cache.match(request);
+    if (cachedPage) return cachedPage;
+  } catch {
+    // キャッシュ読み取り失敗は無視して通常どおりレンダリング
+  }
+
+  const response = await handler.fetch(request, env, ctx);
+
+  if (response.status === 200) {
+    // クライアントへ返す前に同期的に複製を取っておく(返した後だとbody
+    // ストリームが読まれ始めてclone()できないため)。実際にキャッシュするかは
+    // 後段のisFinished判定次第で、該当しなければこの複製は単に捨てられる
+    const toCache = response.clone();
+    const matchId = m[1];
+    ctx.waitUntil(
+      (async () => {
+        try {
+          const isFinished =
+            (await cache.match(new Request(finishedMatchDetailCacheKey(matchId)))) !== undefined;
+          if (!isFinished) return;
+          toCache.headers.set("Cache-Control", `public, max-age=${FINISHED_MATCH_PAGE_TTL_SEC}`);
+          await cache.put(request, toCache);
+        } catch {
+          // キャッシュ保存失敗は無視(次回も同じ判定を試みるだけ)
+        }
+      })()
+    );
+  }
+
+  return response;
+}
+
 async function runSnapshotJob(env: Env): Promise<void> {
   if (!env.PANDASCORE_TOKEN) {
     console.error("[cron] PANDASCORE_TOKEN not set, skipping");
@@ -72,7 +137,7 @@ async function runWorldsSnapshotJob(env: Env): Promise<void> {
 }
 
 export default {
-  fetch: handler.fetch,
+  fetch: fetchWithFinishedMatchCache,
   async scheduled(_event, env: Env, ctx) {
     ctx.waitUntil(runSnapshotJob(env));
     ctx.waitUntil(runWorldsSnapshotJob(env));
