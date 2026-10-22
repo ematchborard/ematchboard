@@ -94,6 +94,15 @@ function formOf(recent: Match[], teamId: number, excludeMatchId: number): string
     .map((m) => (m.winner_id === teamId ? "W" : "L"));
 }
 
+// 終了から48時間以上経った試合は直近フォーム/H2Hを取り直さない(結果が変わらない
+// 上に、ボットが古い試合ページを繰り返し巡回してくるとPandaScore呼び出しが
+// 積み上がるため)。試合中/試合前や終了直後はこれまでどおり取得する
+const RECENT_FORM_CUTOFF_MS = 48 * 60 * 60 * 1000;
+function isOldFinishedMatch(match: MatchDetail): boolean {
+  if (match.status !== "finished" || !match.begin_at) return false;
+  return new Date().getTime() - Date.parse(match.begin_at) > RECENT_FORM_CUTOFF_MS;
+}
+
 export default async function MatchPage({ params }: Props) {
   const { game, id: idParam } = await params;
   const config = getGame(game);
@@ -106,6 +115,10 @@ export default async function MatchPage({ params }: Props) {
   let teamB: TeamDetail | null;
   let recentA: Match[] = [];
   let recentB: Match[] = [];
+  // ロスター取得(getTeam)はWorldsのファン採点機能が選手名を必要とする分だけに
+  // 絞る。それ以外の試合はチームページへのリンクで代替し(下のJSX参照)、
+  // PandaScore呼び出しを1試合あたり最大2回減らす
+  let isWorldsMatch = false;
 
   if (isStartgg) {
     const result = await getStartggMatch(id);
@@ -121,13 +134,15 @@ export default async function MatchPage({ params }: Props) {
       return <UpstreamUnavailable />;
     }
     match = matchResult.data;
+    isWorldsMatch = match.serie?.id === WORLDS_SERIE_ID;
+    const skipRecentForm = isOldFinishedMatch(match);
     const refA = match.opponents[0]?.opponent ?? null;
     const refB = match.opponents[1]?.opponent ?? null;
     const [teamAResult, teamBResult, recentAResult, recentBResult] = await Promise.all([
-      refA ? getTeam(refA.id) : Promise.resolve(null),
-      refB ? getTeam(refB.id) : Promise.resolve(null),
-      refA ? getTeamRecentMatches(refA.id) : Promise.resolve([]),
-      refB ? getTeamRecentMatches(refB.id) : Promise.resolve([]),
+      isWorldsMatch && refA ? getTeam(refA.id) : Promise.resolve(null),
+      isWorldsMatch && refB ? getTeam(refB.id) : Promise.resolve(null),
+      !skipRecentForm && refA ? getTeamRecentMatches(refA.id) : Promise.resolve([]),
+      !skipRecentForm && refB ? getTeamRecentMatches(refB.id) : Promise.resolve([]),
     ]);
     teamA = teamAResult?.kind === "ok" ? teamAResult.data : null;
     teamB = teamBResult?.kind === "ok" ? teamBResult.data : null;
@@ -349,10 +364,28 @@ export default async function MatchPage({ params }: Props) {
 
       <section>
         <h2 className="mb-2 text-sm font-semibold">Lineups</h2>
-        <MatchLineups teamA={teamA} teamB={teamB} />
+        {!isStartgg && !isWorldsMatch ? (
+          <div className="grid grid-cols-2 gap-3">
+            {[teamARef, teamBRef].map((t, i) =>
+              t ? (
+                <Link
+                  key={i}
+                  href={`/${config.slug}/team/${t.id}`}
+                  className="rounded-xl border border-border-subtle bg-surface px-4 py-5 text-center text-sm font-medium text-muted transition-colors hover:text-foreground"
+                >
+                  {t.name} のロスターを見る
+                </Link>
+              ) : (
+                <div key={i} />
+              )
+            )}
+          </div>
+        ) : (
+          <MatchLineups teamA={teamA} teamB={teamB} />
+        )}
       </section>
 
-      {!isStartgg && match.serie?.id === WORLDS_SERIE_ID && (
+      {!isStartgg && isWorldsMatch && (
         <PlayerRatingWidget
           matchId={match.id}
           teamAPlayers={teamA?.players ?? []}
