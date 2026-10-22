@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getGame } from "@/lib/games";
-import { getSerie, getSerieMatches, getSerieTournaments } from "@/lib/pandascore";
+import { kvCache } from "@/lib/pandascore";
 import { jsonLdString } from "@/lib/seo";
 import type { Match, Team } from "@/lib/types";
 import { WORLDS_SERIE_ID, WORLDS_YEAR } from "@/lib/worlds";
+import { readWorldsSnapshot } from "@/lib/worlds-snapshot";
 import StageTabs from "@/components/StageTabs";
 
 // Worlds専用のSEOランディングページ。「Worlds 2026 日程 日本時間」のような
@@ -217,11 +218,28 @@ function PlayoffsSection({ matches }: { matches: Match[] }) {
 
 export default async function WorldsPage() {
   const config = getGame(GAME_SLUG)!;
-  const [serie, stages, matches] = await Promise.all([
-    getSerie(WORLDS_SERIE_ID),
-    getSerieTournaments(WORLDS_SERIE_ID),
-    getSerieMatches(WORLDS_SERIE_ID),
-  ]);
+  const snapshot = await readWorldsSnapshot(await kvCache());
+
+  // Cronの初回実行前(デプロイ直後)、または前回分も含めて丸ごと空の場合だけ
+  // ここに入る。PandaScoreへは直接取りに行かず、空白のまま出すよりも
+  // 分かりやすいメッセージだけ表示する
+  if (
+    !snapshot ||
+    (!snapshot.serie && snapshot.tournaments.length === 0 && snapshot.matches.length === 0)
+  ) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Link href={`/${config.slug}`} className="text-xs text-muted hover:text-foreground">
+          ‹ {config.name} matches
+        </Link>
+        <p className="rounded-xl border border-border-subtle bg-surface px-4 py-10 text-center text-sm text-muted">
+          読み込み中です。少し待って再読み込みしてください。
+        </p>
+      </div>
+    );
+  }
+
+  const { serie, tournaments: stages, matches } = snapshot;
 
   const sortedStages = stages
     .slice()
