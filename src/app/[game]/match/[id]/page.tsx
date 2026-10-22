@@ -10,9 +10,11 @@ import {
 import { getStartggMatch } from "@/lib/startgg";
 import type { Match, MatchDetail, Team, TeamDetail } from "@/lib/types";
 import { jsonLdString } from "@/lib/seo";
+import { WORLDS_SERIE_ID } from "@/lib/worlds";
 import LocalTime from "@/components/LocalTime";
 import MatchLineups from "@/components/MatchLineups";
 import MatchRow from "@/components/MatchCard";
+import PlayerRatingWidget from "@/components/PlayerRatingWidget";
 
 // 試合詳細ページ。
 // 試合前: 両チームのロスター・直近フォーム・過去の対戦成績(H2H)
@@ -338,6 +340,14 @@ export default async function MatchPage({ params }: Props) {
         <h2 className="mb-2 text-sm font-semibold">Lineups</h2>
         <MatchLineups teamA={teamA} teamB={teamB} />
       </section>
+
+      {!isStartgg && match.serie?.id === WORLDS_SERIE_ID && (
+        <PlayerRatingWidget
+          matchId={match.id}
+          teamAPlayers={teamA?.players ?? []}
+          teamBPlayers={teamB?.players ?? []}
+        />
+      )}
     </div>
   );
 }
