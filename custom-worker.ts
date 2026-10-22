@@ -19,6 +19,7 @@
 // @ts-ignore
 import handler from "./.open-next/worker.js";
 import { buildTodaySnapshot, writeTodaySnapshot } from "./src/lib/today-snapshot";
+import { buildWorldsSnapshot, writeWorldsSnapshot } from "./src/lib/worlds-snapshot";
 
 interface Env {
   MATCH_CACHE: KVNamespace;
@@ -50,10 +51,31 @@ async function runSnapshotJob(env: Env): Promise<void> {
   }
 }
 
+// /worlds ページ専用のスナップショット(series/tournaments/matches)。
+// today-snapshotとは独立したジョブなので、片方が失敗してももう片方には影響しない
+async function runWorldsSnapshotJob(env: Env): Promise<void> {
+  if (!env.PANDASCORE_TOKEN) return; // 上のジョブで既にログ済み
+  try {
+    const result = await buildWorldsSnapshot(env.PANDASCORE_TOKEN);
+    const { written, keptFromPrevious } = await writeWorldsSnapshot(env.MATCH_CACHE, result);
+    if (!written) {
+      console.error("[cron][worlds] serie+tournaments+matches all failed, skipping write");
+      return;
+    }
+    console.log(
+      `[cron][worlds] snapshot written: ${result.snapshot.matches.length} matches` +
+        (keptFromPrevious.length > 0 ? `, kept previous for: ${keptFromPrevious.join(",")}` : "")
+    );
+  } catch (err) {
+    console.error("[cron][worlds] snapshot build failed:", err);
+  }
+}
+
 export default {
   fetch: handler.fetch,
   async scheduled(_event, env: Env, ctx) {
     ctx.waitUntil(runSnapshotJob(env));
+    ctx.waitUntil(runWorldsSnapshotJob(env));
   },
 } satisfies ExportedHandler<Env>;
 
