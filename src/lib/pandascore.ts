@@ -301,10 +301,7 @@ export async function getTournamentStandings(
 
 // 試合詳細 (マップごとの結果を含む)
 const FINISHED_MATCH_TTL_SEC = 7 * 24 * 60 * 60; // 終了済み試合は結果が変わらないので長めに
-// middleware.tsも「この試合は終了済みか」の判定に同じキーを使う
-// (CDNエッジキャッシュのCache-Controlを付けるかどうかの判定、追加のPandaScore
-// 呼び出し無しで済ませるため)ので export している
-export const finishedMatchCacheKey = (id: number) => `match-detail-finished:${id}`;
+const finishedMatchCacheKey = (id: number) => `match-detail-finished:${id}`;
 
 // 終了済み試合はpsFetchの通常キャッシュ(5分)より長い専用キャッシュを先に見る。
 // ボットが古い試合詳細ページを繰り返し巡回してくるケースで、2回目以降は
