@@ -39,8 +39,8 @@
       "database_id": "6e3227a1-a06a-4c37-b5ff-30fdaa8e6d22"
     }
   ]
-  // PANDASCORE_TOKEN・TURNSTILE_SECRET_KEY は絶対にここに書かない。
-  // Cloudflareダッシュボード(Workers & Pages → ematchboard → Settings →
-  // Variables and Secrets)からSecretとして登録する
+  // PANDASCORE_TOKEN・TURNSTILE_SECRET_KEY・RATINGS_PEPPER は絶対にここに
+  // 書かない。Cloudflareダッシュボード(Workers & Pages → ematchboard →
+  // Settings → Variables and Secrets)からSecretとして登録する
   // (ローカルプレビュー用は .dev.vars に書く)
 }
