@@ -1,40 +1,9 @@
+import { roleLabelOf, sortByRole } from "@/lib/lol-roles";
 import type { Player, TeamDetail } from "@/lib/types";
 
 // FotMob風の対面ラインナップ。データは各チームの登録ロスター
 // (試合単位の出場選手・レーティングは有料データのため未対応)。
 // LoLはロール順(TOP/JNG/MID/BOT/SUP)に並べて同ロール同士を向かい合わせる。
-
-const ROLE_ORDER: Record<string, number> = {
-  top: 0,
-  jun: 1,
-  jungle: 1,
-  mid: 2,
-  adc: 3,
-  bot: 3,
-  sup: 4,
-  support: 4,
-};
-
-const ROLE_LABEL: Record<string, string> = {
-  top: "TOP",
-  jun: "JNG",
-  jungle: "JNG",
-  mid: "MID",
-  adc: "BOT",
-  bot: "BOT",
-  sup: "SUP",
-  support: "SUP",
-};
-
-function sortByRole(players: Player[]): Player[] {
-  return players
-    .slice()
-    .sort(
-      (a, b) =>
-        (ROLE_ORDER[a.role?.toLowerCase() ?? ""] ?? 9) -
-        (ROLE_ORDER[b.role?.toLowerCase() ?? ""] ?? 9)
-    );
-}
 
 function PlayerCell({
   player,
@@ -92,8 +61,7 @@ export default function MatchLineups({
     );
   }
 
-  const roleOf = (p: Player | undefined) =>
-    p?.role ? (ROLE_LABEL[p.role.toLowerCase()] ?? p.role.toUpperCase()) : null;
+  const roleOf = (p: Player | undefined) => roleLabelOf(p?.role ?? null);
 
   return (
     <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface">

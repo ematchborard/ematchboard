@@ -8,10 +8,12 @@ import {
   getTeamRecentMatches,
 } from "@/lib/pandascore";
 import { getStartggMatch } from "@/lib/startgg";
+import { selectStartingFive } from "@/lib/lol-roles";
 import type { Match, MatchDetail, Team, TeamDetail } from "@/lib/types";
 import { jsonLdString } from "@/lib/seo";
 import { markUnavailable } from "@/lib/unavailable-flag";
 import { WORLDS_SERIE_ID } from "@/lib/worlds";
+import { ROSTER_OVERRIDES } from "@/data/roster-overrides";
 import LocalTime from "@/components/LocalTime";
 import MatchLineups from "@/components/MatchLineups";
 import MatchRow from "@/components/MatchCard";
@@ -388,8 +390,9 @@ export default async function MatchPage({ params }: Props) {
       {!isStartgg && isWorldsMatch && (
         <PlayerRatingWidget
           matchId={match.id}
-          teamAPlayers={teamA?.players ?? []}
-          teamBPlayers={teamB?.players ?? []}
+          isFinished={match.status === "finished"}
+          teamAPlayers={selectStartingFive(teamA?.players ?? [], ROSTER_OVERRIDES[match.id]?.teamAIds)}
+          teamBPlayers={selectStartingFive(teamB?.players ?? [], ROSTER_OVERRIDES[match.id]?.teamBIds)}
         />
       )}
     </div>

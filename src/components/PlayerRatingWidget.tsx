@@ -4,12 +4,12 @@ import Script from "next/script";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Player } from "@/lib/types";
 
-// ファン採点(ステップ3): 点数のみ。コメント・いいね・通報はステップ4で追加する。
-// ロスターは試合ページが既に取得しているTeamDetail.playersをそのまま使う
-// (Worlds限定機能なので追加のPandaScore呼び出しは発生しない)。
-// Turnstileは投票のたびにexecute()で新しいトークンを取る(invisible実行)方式。
-// 1個のウィジェットを使い回すので、10人を評価してもチャレンジ画面が出るのは
-// (Cloudflareが怪しいと判定した場合の)最初の1回だけで済む。
+// ファン採点(デプロイ1): 試合終了後だけ受け付ける・控えを除いた5人のみ表示・
+// Turnstileは普段は幅0で隠し、投票(execute)の間だけ見せる(Cloudflareが
+// 実際にチャレンジを出した場合だけその場に表示される)。
+// カード型UI(2カラム・案内バー・ファン選出MVP等)はデプロイ2で別途対応する。
+// ロスターは試合ページが既に取得しているTeamDetail.playersから選んだ5人を
+// そのまま使う(Worlds限定機能なので追加のPandaScore呼び出しは発生しない)。
 
 const TURNSTILE_SITE_KEY = "0x4AAAAAAFfz_mUUYY0c7nF_";
 const SCORES = Array.from({ length: 10 }, (_, i) => i + 1);
@@ -62,10 +62,12 @@ function PlayerAvatar({ player }: { player: Player }) {
 
 export default function PlayerRatingWidget({
   matchId,
+  isFinished,
   teamAPlayers,
   teamBPlayers,
 }: {
   matchId: number;
+  isFinished: boolean;
   teamAPlayers: Player[];
   teamBPlayers: Player[];
 }) {
@@ -73,11 +75,13 @@ export default function PlayerRatingWidget({
   const [stats, setStats] = useState<Record<number, PlayerStat>>({});
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [turnstileVisible, setTurnstileVisible] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
   const tokenResolverRef = useRef<((token: string) => void) | null>(null);
 
   useEffect(() => {
+    if (!isFinished) return;
     let cancelled = false;
     fetch(`/api/ratings?matchId=${matchId}`)
       .then((r) => r.json() as Promise<RatingsGetResponse>)
@@ -97,7 +101,7 @@ export default function PlayerRatingWidget({
     return () => {
       cancelled = true;
     };
-  }, [matchId]);
+  }, [matchId, isFinished]);
 
   const setupTurnstile = useCallback(() => {
     if (!window.turnstile || !containerRef.current || widgetIdRef.current) return;
@@ -122,6 +126,9 @@ export default function PlayerRatingWidget({
         return;
       }
       tokenResolverRef.current = resolve;
+      // 普段は幅0で隠しておき、Cloudflareが実際にチャレンジを要求した
+      // 場合だけ(execute中)見える状態にする
+      setTurnstileVisible(true);
       window.turnstile.execute(widgetIdRef.current);
     });
   }, []);
@@ -147,6 +154,7 @@ export default function PlayerRatingWidget({
         setError(err instanceof Error ? err.message : "投票に失敗しました");
       } finally {
         if (widgetIdRef.current) window.turnstile?.reset(widgetIdRef.current);
+        setTurnstileVisible(false);
         setPendingId(null);
       }
     },
@@ -154,6 +162,17 @@ export default function PlayerRatingWidget({
   );
 
   if (players.length === 0) return null;
+
+  if (!isFinished) {
+    return (
+      <section>
+        <h2 className="mb-2 text-sm font-semibold">ファン採点</h2>
+        <p className="rounded-xl border border-border-subtle bg-surface px-4 py-6 text-center text-sm text-muted">
+          ファン採点は試合終了後に始まります(終了後7日間受付)
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section>
@@ -163,7 +182,7 @@ export default function PlayerRatingWidget({
         strategy="afterInteractive"
         onReady={setupTurnstile}
       />
-      <div ref={containerRef} />
+      <div ref={containerRef} className={turnstileVisible ? "mb-2" : "h-0 w-0 overflow-hidden"} />
       {error && <p className="mb-2 text-xs text-live">{error}</p>}
       <div className="divide-y divide-border-subtle overflow-hidden rounded-xl border border-border-subtle bg-surface">
         {players.map((p) => {
