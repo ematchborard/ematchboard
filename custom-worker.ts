@@ -19,8 +19,7 @@
 // @ts-ignore
 import handler from "./.open-next/worker.js";
 import { buildTodaySnapshot, writeTodaySnapshot } from "./src/lib/today-snapshot";
-import { buildWorldsSnapshot, readWorldsSnapshot, writeWorldsSnapshot } from "./src/lib/worlds-snapshot";
-import { extractWorldsTeamIds, refreshWorldsRecentForm } from "./src/lib/worlds-recent-form";
+import { buildWorldsSnapshot, writeWorldsSnapshot } from "./src/lib/worlds-snapshot";
 
 interface Env {
   MATCH_CACHE: KVNamespace;
@@ -137,33 +136,11 @@ async function runWorldsSnapshotJob(env: Env): Promise<void> {
   }
 }
 
-// Worlds出場チームの直近成績(Recent form)を1時間おきにまとめて温めておく
-// (lib/worlds-recent-form.ts。lib/pandascore.tsのgetTeamRecentMatchesと同じ
-// キャッシュキーに書くので、試合ページ側はCronが先に書いていればPandaScoreを
-// 呼ばずに済む)。5分おきのメインCronとは別のtrigger("0 * * * *",
-// wrangler.jsonc参照)からevent.cronで振り分けて、1時間に1回だけ実行する
-async function runWorldsRecentFormJob(env: Env): Promise<void> {
-  if (!env.PANDASCORE_TOKEN) return; // 他のジョブで既にログ済み
-  try {
-    const snapshot = await readWorldsSnapshot(env.MATCH_CACHE);
-    if (!snapshot) return;
-    const teamIds = extractWorldsTeamIds(snapshot);
-    if (teamIds.length === 0) return;
-    await refreshWorldsRecentForm(env.PANDASCORE_TOKEN, teamIds);
-    console.log(`[cron][worlds-recent-form] refreshed ${teamIds.length} teams`);
-  } catch (err) {
-    console.error("[cron][worlds-recent-form] failed:", err);
-  }
-}
-
 export default {
   fetch: fetchWithFinishedMatchCache,
-  async scheduled(event, env: Env, ctx) {
+  async scheduled(_event, env: Env, ctx) {
     ctx.waitUntil(runSnapshotJob(env));
     ctx.waitUntil(runWorldsSnapshotJob(env));
-    if (event.cron === "0 * * * *") {
-      ctx.waitUntil(runWorldsRecentFormJob(env));
-    }
   },
 } satisfies ExportedHandler<Env>;
 

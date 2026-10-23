@@ -14,18 +14,13 @@
   "observability": {
     "enabled": true
   },
-  // 「今日の全ゲーム分の試合」スナップショットをKVに書くCron(5分おき)と、
-  // Worlds出場チームの直近成績(Recent form)を温めるCron(1時間おき、
-  // custom-worker.tsのscheduled()がevent.cronで振り分ける)。
+  // 「今日の全ゲーム分の試合」スナップショットをKVに書くCron(5分おき)。
   // UTC基準(Cloudflareの仕様)だが間隔指定なのでJSTとのズレは影響しない
   "triggers": {
-    "crons": ["*/5 * * * *", "0 * * * *"]
+    "crons": ["*/5 * * * *"]
   },
-  // Cronが書くスナップショット(今日の試合・Worldsのserie/tournaments/matches)
-  // 専用。それ以外の試合/チーム/大会データのキャッシュはCache API
-  // (caches.default、拠点ごと)を使う — 以前はこちらもKVだったが、
-  // アクセス頻度に比例して無料枠(書き込み1,000回/日)を使い切る不具合が
-  // あったため2026-10-22にCache APIへ戻した(詳細はlib/edge-cache.ts参照)。
+  // 試合データの拠点間共有キャッシュ(caches.defaultは拠点ごとに別物で
+  // グローバル共有ではなかったため、2026-10-11にKVへ移行)。
   // Cloudflareダッシュボード → Storage & Databases → KV で
   // 新規Namespaceを作成し、そのIDを id に設定すること
   "kv_namespaces": [

@@ -89,12 +89,21 @@ function TeamLogo({ team, size }: { team: Team | null; size: string }) {
   );
 }
 
-// 直近5戦の勝敗(この試合自体は除く)
-function formOf(recent: Match[], teamId: number, excludeMatchId: number): ("勝" | "敗")[] {
+// 直近5戦のW/L(この試合自体は除く)
+function formOf(recent: Match[], teamId: number, excludeMatchId: number): string[] {
   return recent
     .filter((m) => m.id !== excludeMatchId && m.status === "finished")
     .slice(0, 5)
-    .map((m) => (m.winner_id === teamId ? "勝" : "敗"));
+    .map((m) => (m.winner_id === teamId ? "W" : "L"));
+}
+
+// 終了から48時間以上経った試合は直近フォーム/H2Hを取り直さない(結果が変わらない
+// 上に、ボットが古い試合ページを繰り返し巡回してくるとPandaScore呼び出しが
+// 積み上がるため)。試合中/試合前や終了直後はこれまでどおり取得する
+const RECENT_FORM_CUTOFF_MS = 48 * 60 * 60 * 1000;
+function isOldFinishedMatch(match: MatchDetail): boolean {
+  if (match.status !== "finished" || !match.begin_at) return false;
+  return new Date().getTime() - Date.parse(match.begin_at) > RECENT_FORM_CUTOFF_MS;
 }
 
 export default async function MatchPage({ params }: Props) {
@@ -107,9 +116,8 @@ export default async function MatchPage({ params }: Props) {
   let match: MatchDetail | null;
   let teamA: TeamDetail | null;
   let teamB: TeamDetail | null;
-  // null = 取得失敗(欄ごと非表示にする)。[] = 取得できたが直近の試合が無い
-  let recentA: Match[] | null = [];
-  let recentB: Match[] | null = [];
+  let recentA: Match[] = [];
+  let recentB: Match[] = [];
   // ロスター取得(getTeam)はWorldsのファン採点機能が選手名を必要とする分だけに
   // 絞る。それ以外の試合はチームページへのリンクで代替し(下のJSX参照)、
   // PandaScore呼び出しを1試合あたり最大2回減らす
@@ -130,15 +138,14 @@ export default async function MatchPage({ params }: Props) {
     }
     match = matchResult.data;
     isWorldsMatch = match.serie?.id === WORLDS_SERIE_ID;
+    const skipRecentForm = isOldFinishedMatch(match);
     const refA = match.opponents[0]?.opponent ?? null;
     const refB = match.opponents[1]?.opponent ?? null;
-    // 直近成績(getTeamRecentMatches)はチームID単位でCache APIに6時間
-    // キャッシュされるので、古い試合でも毎回PandaScoreを叩くわけではない
     const [teamAResult, teamBResult, recentAResult, recentBResult] = await Promise.all([
       isWorldsMatch && refA ? getTeam(refA.id) : Promise.resolve(null),
       isWorldsMatch && refB ? getTeam(refB.id) : Promise.resolve(null),
-      refA ? getTeamRecentMatches(refA.id) : Promise.resolve([]),
-      refB ? getTeamRecentMatches(refB.id) : Promise.resolve([]),
+      !skipRecentForm && refA ? getTeamRecentMatches(refA.id) : Promise.resolve([]),
+      !skipRecentForm && refB ? getTeamRecentMatches(refB.id) : Promise.resolve([]),
     ]);
     teamA = teamAResult?.kind === "ok" ? teamAResult.data : null;
     teamB = teamBResult?.kind === "ok" ? teamBResult.data : null;
@@ -180,7 +187,7 @@ export default async function MatchPage({ params }: Props) {
 
   const h2h =
     teamARef && teamBRef
-      ? (recentA ?? []).filter(
+      ? recentA.filter(
           (m) =>
             m.id !== match.id &&
             m.status === "finished" &&
@@ -190,8 +197,8 @@ export default async function MatchPage({ params }: Props) {
   const h2hAWins = h2h.filter((m) => m.winner_id === teamARef?.id).length;
   const h2hBWins = h2h.filter((m) => m.winner_id === teamBRef?.id).length;
 
-  const formA = teamARef ? formOf(recentA ?? [], teamARef.id, match.id) : [];
-  const formB = teamBRef ? formOf(recentB ?? [], teamBRef.id, match.id) : [];
+  const formA = teamARef ? formOf(recentA, teamARef.id, match.id) : [];
+  const formB = teamBRef ? formOf(recentB, teamBRef.id, match.id) : [];
 
   const nameOf = (teamId: number | null) =>
     teamId === teamARef?.id
@@ -324,46 +331,41 @@ export default async function MatchPage({ params }: Props) {
         </section>
       )}
 
-      {!isStartgg &&
-        (() => {
-          const entries = [
-            { team: teamARef, form: formA, recent: recentA },
-            { team: teamBRef, form: formB, recent: recentB },
-          ].filter((x) => x.recent !== null); // 取得失敗した側は欄ごと非表示
-          if (entries.length === 0) return null;
-          return (
-            <section className="grid grid-cols-2 gap-3">
-              {entries.map((x, i) => (
-                <div
-                  key={i}
-                  className="rounded-xl border border-border-subtle bg-surface px-4 py-3"
-                >
-                  <p className="mb-2 truncate text-xs font-semibold text-muted">
-                    {x.team?.name ?? "TBD"} — 直近5試合
-                  </p>
-                  {x.form.length === 0 ? (
-                    <p className="text-xs text-muted">直近の試合がありません</p>
-                  ) : (
-                    <div className="flex gap-1">
-                      {x.form.map((r, j) => (
-                        <span
-                          key={j}
-                          className={`flex h-6 w-6 items-center justify-center rounded text-[11px] font-bold ${
-                            r === "勝"
-                              ? "bg-emerald-500/15 text-emerald-400"
-                              : "bg-live/15 text-live"
-                          }`}
-                        >
-                          {r}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+      {!isStartgg && (
+        <section className="grid grid-cols-2 gap-3">
+          {[
+            { team: teamARef, form: formA },
+            { team: teamBRef, form: formB },
+          ].map((x, i) => (
+            <div
+              key={i}
+              className="rounded-xl border border-border-subtle bg-surface px-4 py-3"
+            >
+              <p className="mb-2 truncate text-xs font-semibold text-muted">
+                {x.team?.name ?? "TBD"} — Recent form
+              </p>
+              {x.form.length === 0 ? (
+                <p className="text-xs text-muted">No recent matches</p>
+              ) : (
+                <div className="flex gap-1">
+                  {x.form.map((r, j) => (
+                    <span
+                      key={j}
+                      className={`flex h-6 w-6 items-center justify-center rounded text-[11px] font-bold ${
+                        r === "W"
+                          ? "bg-emerald-500/15 text-emerald-400"
+                          : "bg-live/15 text-live"
+                      }`}
+                    >
+                      {r}
+                    </span>
+                  ))}
                 </div>
-              ))}
-            </section>
-          );
-        })()}
+              )}
+            </div>
+          ))}
+        </section>
+      )}
 
       {h2h.length > 0 && (
         <section>
