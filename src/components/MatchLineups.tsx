@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { roleLabelOf, sortByRole } from "@/lib/lol-roles";
-import type { Player, TeamDetail } from "@/lib/types";
+import type { Player } from "@/lib/types";
 
-// FotMob風の対面ラインナップ。データは各チームの登録ロスター
-// (試合単位の出場選手・レーティングは有料データのため未対応)。
-// LoLはロール順(TOP/JNG/MID/BOT/SUP)に並べて同ロール同士を向かい合わせる。
+// FotMob風の対面ラインナップ。表示する行(teamAPlayers/teamBPlayers)は
+// 呼び出し側(ページ)が決める — Worldsは控えを除いた5人
+// (lib/lol-roles.tsのselectStartingFive)、start.gg出典はエントラントの
+// 登録選手をそのまま渡す。控え(teamABench/teamBBench)があれば表の下に
+// 小さく1行で出す(行としては出さない)。
 // ratingsMatchIdが渡された場合(Worlds・終了済み試合)のみ、ロールの左右に
 // ファン採点の平均点バッジを表示する。試合ページ自体は終了後7日間フルページ
 // キャッシュされるため、平均点はページ表示後にブラウザ側で/api/ratingsから
@@ -85,12 +87,20 @@ function PlayerCell({
 const GRID_COLS = "grid-cols-[1fr_54px_56px_54px_1fr]";
 
 export default function MatchLineups({
-  teamA,
-  teamB,
+  teamAName,
+  teamBName,
+  teamAPlayers,
+  teamBPlayers,
+  teamABench = [],
+  teamBBench = [],
   ratingsMatchId,
 }: {
-  teamA: TeamDetail | null;
-  teamB: TeamDetail | null;
+  teamAName: string;
+  teamBName: string;
+  teamAPlayers: Player[];
+  teamBPlayers: Player[];
+  teamABench?: Player[];
+  teamBBench?: Player[];
   ratingsMatchId?: number;
 }) {
   const [scores, setScores] = useState<Record<number, ScoreStat>>({});
@@ -112,8 +122,8 @@ export default function MatchLineups({
     };
   }, [ratingsMatchId]);
 
-  const a = sortByRole(teamA?.players ?? []);
-  const b = sortByRole(teamB?.players ?? []);
+  const a = sortByRole(teamAPlayers);
+  const b = sortByRole(teamBPlayers);
   const rows = Math.max(a.length, b.length);
   if (rows === 0) {
     return (
@@ -125,15 +135,19 @@ export default function MatchLineups({
 
   const roleOf = (p: Player | undefined) => roleLabelOf(p?.role ?? null);
   const showScores = Boolean(ratingsMatchId);
+  const bench = [
+    ...teamABench.map((p) => `${p.name}(${teamAName})`),
+    ...teamBBench.map((p) => `${p.name}(${teamBName})`),
+  ];
 
   return (
     <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface">
       <div className={`grid ${GRID_COLS} items-center gap-2 border-b border-border-subtle bg-surface-hover/50 px-4 py-2.5`}>
-        <span className="truncate text-right text-sm font-semibold">{teamA?.name ?? "TBD"}</span>
+        <span className="truncate text-right text-sm font-semibold">{teamAName}</span>
         <span />
         <span className="text-center text-[10px] font-bold tracking-wider text-muted">VS</span>
         <span />
-        <span className="truncate text-left text-sm font-semibold">{teamB?.name ?? "TBD"}</span>
+        <span className="truncate text-left text-sm font-semibold">{teamBName}</span>
       </div>
       <div className="divide-y divide-border-subtle">
         {Array.from({ length: rows }, (_, i) => (
@@ -149,7 +163,8 @@ export default function MatchLineups({
         ))}
       </div>
       <p className="border-t border-border-subtle px-4 py-2 text-center text-[10px] text-muted">
-        Registered rosters — actual starters may differ
+        スタメンは実際と異なる場合があります
+        {bench.length > 0 && <>　控え: {bench.join("、")}</>}
       </p>
     </div>
   );

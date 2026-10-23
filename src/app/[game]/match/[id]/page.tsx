@@ -8,7 +8,7 @@ import {
   getTeamRecentMatches,
 } from "@/lib/pandascore";
 import { getStartggMatch } from "@/lib/startgg";
-import { selectStartingFive } from "@/lib/lol-roles";
+import { selectBench, selectStartingFive } from "@/lib/lol-roles";
 import type { Match, MatchDetail, Team, TeamDetail } from "@/lib/types";
 import { jsonLdString } from "@/lib/seo";
 import { markUnavailable } from "@/lib/unavailable-flag";
@@ -163,6 +163,8 @@ export default async function MatchPage({ params }: Props) {
   const ratingTeamBPlayers = isWorldsMatch
     ? selectStartingFive(teamB?.players ?? [], ROSTER_OVERRIDES[match.id]?.teamBIds)
     : [];
+  const ratingTeamABench = isWorldsMatch ? selectBench(teamA?.players ?? [], ratingTeamAPlayers) : [];
+  const ratingTeamBBench = isWorldsMatch ? selectBench(teamB?.players ?? [], ratingTeamBPlayers) : [];
 
   const scoreOf = (team: Team | null) =>
     team ? (match.results.find((r) => r.team_id === team.id)?.score ?? null) : null;
@@ -404,8 +406,12 @@ export default async function MatchPage({ params }: Props) {
           </div>
         ) : (
           <MatchLineups
-            teamA={teamA}
-            teamB={teamB}
+            teamAName={teamARef?.name ?? "TBD"}
+            teamBName={teamBRef?.name ?? "TBD"}
+            teamAPlayers={isWorldsMatch ? ratingTeamAPlayers : (teamA?.players ?? [])}
+            teamBPlayers={isWorldsMatch ? ratingTeamBPlayers : (teamB?.players ?? [])}
+            teamABench={isWorldsMatch ? ratingTeamABench : []}
+            teamBBench={isWorldsMatch ? ratingTeamBBench : []}
             ratingsMatchId={!isStartgg && isWorldsMatch && match.status === "finished" ? match.id : undefined}
           />
         )}
