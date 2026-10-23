@@ -13,7 +13,7 @@ import type { Match, MatchDetail, Team, TeamDetail } from "@/lib/types";
 import { jsonLdString } from "@/lib/seo";
 import { markUnavailable } from "@/lib/unavailable-flag";
 import { WORLDS_SERIE_ID } from "@/lib/worlds";
-import { ROSTER_OVERRIDES } from "@/data/roster-overrides";
+import { WORLDS_ROSTER_OVERRIDES } from "@/data/roster-overrides";
 import FanMvpCard from "@/components/FanMvpCard";
 import LocalTime from "@/components/LocalTime";
 import MatchLineups from "@/components/MatchLineups";
@@ -156,12 +156,21 @@ export default async function MatchPage({ params }: Props) {
   const teamARef = match.opponents[0]?.opponent ?? null;
   const teamBRef = match.opponents[1]?.opponent ?? null;
   // ファン採点(MVPカード・ラインナップの点数バッジ・投票カード)で共通して使う
-  // 「控えを除いた5人」。3箇所で同じ選出結果にするため一度だけ計算する
+  // 「控えを除いた5人」。3箇所で同じ選出結果にするため一度だけ計算する。
+  // 手動スタメン指定(チームのacronymで引く)はdata/roster-overrides.ts参照
   const ratingTeamAPlayers = isWorldsMatch
-    ? selectStartingFive(teamA?.players ?? [], ROSTER_OVERRIDES[match.id]?.teamAIds)
+    ? selectStartingFive(
+        teamA?.players ?? [],
+        teamA?.acronym ? WORLDS_ROSTER_OVERRIDES[teamA.acronym.toUpperCase()] : undefined,
+        teamA?.acronym ?? undefined
+      )
     : [];
   const ratingTeamBPlayers = isWorldsMatch
-    ? selectStartingFive(teamB?.players ?? [], ROSTER_OVERRIDES[match.id]?.teamBIds)
+    ? selectStartingFive(
+        teamB?.players ?? [],
+        teamB?.acronym ? WORLDS_ROSTER_OVERRIDES[teamB.acronym.toUpperCase()] : undefined,
+        teamB?.acronym ?? undefined
+      )
     : [];
   const ratingTeamABench = isWorldsMatch ? selectBench(teamA?.players ?? [], ratingTeamAPlayers) : [];
   const ratingTeamBBench = isWorldsMatch ? selectBench(teamB?.players ?? [], ratingTeamBPlayers) : [];
@@ -298,13 +307,13 @@ export default async function MatchPage({ params }: Props) {
       {showMaps && (
         <section className="overflow-hidden rounded-xl border border-border-subtle bg-surface">
           <h2 className="border-b border-border-subtle bg-surface-hover/50 px-4 py-2.5 text-sm font-semibold">
-            Maps
+            {config.slug === "lol" ? "Games" : "Maps"}
           </h2>
           <div className="divide-y divide-border-subtle">
             {match.games.map((g) => (
               <div key={g.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                 <span className="w-14 shrink-0 text-xs font-semibold text-muted">
-                  Map {g.position}
+                  {config.slug === "lol" ? "Game" : "Map"} {g.position}
                 </span>
                 {g.status === "finished" && g.winner?.id ? (
                   <span className="font-medium">{nameOf(g.winner.id)} win</span>
