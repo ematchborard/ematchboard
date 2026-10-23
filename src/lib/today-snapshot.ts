@@ -69,7 +69,9 @@ async function fetchGameMatches(
 async function fetchRunningTournaments(
   token: string
 ): Promise<{ tournaments: RunningTournament[]; ok: boolean }> {
-  const params = new URLSearchParams({ "filter[tier]": "s,a", per_page: "50" });
+  // tierでの絞り込みはしない(lib/pandascore.tsのgetRunningTournamentsと同じ理由)。
+  // tier/大会名での絞り込みはfeatured.tsのgetRunningSeries側で行う
+  const params = new URLSearchParams({ per_page: "100" });
   const url = `${API_BASE}/tournaments/running?${params}`;
   let res: Response;
   try {

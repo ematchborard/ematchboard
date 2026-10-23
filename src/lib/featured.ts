@@ -114,6 +114,33 @@ export interface RunningSerie {
   url: string;
 }
 
+// tierが低くても「開催中の大会」に必ず出す世界大会クラスの大会名パターン。
+// PandaScoreのtier付けは大会によって粒度がまちまちで、VALORANT Game Changers
+// Championshipのような国際大会でも tier s/a が付かないことがあるため
+// (2026-10-23対応)。大会名(league名+serie名+tournament名)のどこかに
+// マッチすれば採用する。新しいパターンを増やしたいときはここに1行足すだけでよい
+const MAJOR_EVENT_NAME_PATTERNS: RegExp[] = [
+  /champions(?:hip)?/i, // "Champions", "Championship", "Game Changers Championship" 等
+  /masters/i,
+  /worlds/i,
+  /\bmsi\b/i,
+  /major/i,
+];
+
+function isMajorEventName(t: { league: { name: string }; serie: { full_name: string | null }; name: string }): boolean {
+  const text = `${t.league.name} ${t.serie.full_name ?? ""} ${t.name}`;
+  return MAJOR_EVENT_NAME_PATTERNS.some((p) => p.test(text));
+}
+
+// tier・大会名のどちらの自動判定にも引っかからない大会を、大会ID(serie_id、
+// イベントページURL /[game]/event/[id] の末尾の数字)と開催期間を指定して
+// 強制的に「開催中の大会」に含めるための一覧(開催中のPandaScoreデータに
+// serie自体が存在する前提。表示名はそちらから取る)。
+// 使い方: 該当大会のserie_idと期間を1行足すだけでよい
+const MANUAL_RUNNING_SERIE_IDS: { serieId: number; start: string; end: string }[] = [
+  // 例: { serieId: 12345, start: "2026-10-22", end: "2026-11-01" },
+];
+
 // PandaScoreの1シリーズにまとまらない特別イベント(EWCのような複数タイトル
 // 横断の大会)を、開催期間中だけ手動で差し込むための配列。
 // 新しいイベントを追加したいときはここに1行足すだけでよい
@@ -173,9 +200,31 @@ export async function getRunningSeries(): Promise<RunningSerie[]> {
       bySerie.set(t.serie.id, t);
     }
   }
-  const tierRank = (t: string | null) => (t === "s" ? 0 : t === "a" ? 1 : 2);
+
+  const manualOverrideIds = new Set(
+    MANUAL_RUNNING_SERIE_IDS.filter((o) => todayStr >= o.start && todayStr <= o.end).map(
+      (o) => o.serieId
+    )
+  );
+  // tier s/a、世界大会クラスの大会名、手動追加のいずれかに当てはまる大会だけ採用する
+  // (tierの絞り込みをAPI側でしなくなった分、ここでまとめて行う)
+  const qualifies = (t: (typeof raw)[number]) => {
+    const tier = (t.tier ?? "").toLowerCase();
+    if (tier === "s" || tier === "a") return true;
+    if (manualOverrideIds.has(t.serie.id)) return true;
+    return isMajorEventName(t);
+  };
+  // 強制採用枠(大会名マッチ・手動追加)はtier無指定でも埋もれないよう、
+  // tier aと同等以上の優先度で並べる
+  const tierRank = (t: (typeof raw)[number]) => {
+    if (t.tier === "s") return 0;
+    if (manualOverrideIds.has(t.serie.id) || isMajorEventName(t)) return 0.5;
+    if (t.tier === "a") return 1;
+    return 2;
+  };
   const fromApi: RunningSerie[] = [...bySerie.values()]
-    .sort((a, b) => tierRank(a.tier) - tierRank(b.tier))
+    .filter(qualifies)
+    .sort((a, b) => tierRank(a) - tierRank(b))
     .map((t) => {
       const game = getGame(t.videogame.slug) as GameConfig;
       // Worldsは専用ページ(/worlds, 日本時間の日程まとめ)に集約する

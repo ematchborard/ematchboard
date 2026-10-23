@@ -226,9 +226,12 @@ export interface RunningTournament extends Tournament {
 export async function getRunningTournaments(): Promise<RunningTournament[]> {
   if (!hasApiToken()) return [];
   try {
+    // tierでの絞り込みはしない(2026-10-23、VALORANT Game Changers
+    // Championshipのような国際大会がPandaScore側で低いtierのまま
+    // 「開催中の大会」に出てこない不具合への対応)。tier/大会名での
+    // 絞り込みはfeatured.tsのgetRunningSeries側でまとめて行う
     return await psFetch<RunningTournament[]>("/tournaments/running", {
-      "filter[tier]": "s,a",
-      per_page: "50",
+      per_page: "100",
     });
   } catch {
     return [];

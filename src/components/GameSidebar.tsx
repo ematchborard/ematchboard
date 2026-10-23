@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
+import { isEwcActive } from "@/lib/ewc";
 import { useFollowedGames, useFollowedTeams } from "@/lib/follow";
 import type { GameCategory, GameConfig } from "@/lib/games";
 import type { RunningSerie } from "@/lib/featured";
@@ -201,20 +202,22 @@ export default function GameSidebar({
           </span>
           Home
         </Link>
-        <Link
-          href="/ewc"
-          prefetch={false}
-          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-            isActive("ewc")
-              ? "bg-surface-hover text-amber-400"
-              : "text-muted hover:bg-surface-hover hover:text-foreground"
-          }`}
-        >
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-400/15 text-[10px] font-bold text-amber-400">
-            🏆
-          </span>
-          Esports World Cup
-        </Link>
+        {isEwcActive() && (
+          <Link
+            href="/ewc"
+            prefetch={false}
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              isActive("ewc")
+                ? "bg-surface-hover text-amber-400"
+                : "text-muted hover:bg-surface-hover hover:text-foreground"
+            }`}
+          >
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-400/15 text-[10px] font-bold text-amber-400">
+              🏆
+            </span>
+            Esports World Cup
+          </Link>
+        )}
       </Card>
 
       {runningSeries.length > 0 && (

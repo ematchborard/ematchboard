@@ -12,6 +12,18 @@ export const EWC_LOCATION = "Paris, France";
 export const EWC_PRIZE_POOL = "$75,000,000";
 export const EWC_INFO_URL = "https://liquipedia.net/esports/Esports_World_Cup/2026";
 
+// サイドバー/タブのEWCリンクは開催期間中(+終了後3日)だけ出す。来年の日程が
+// 決まったらEWC_START/EWC_ENDを更新するだけで自動的にまた出るようになる
+// (2026-10-23、2026年大会が終わってもリンクが残り続けていた不具合への対応)
+const EWC_SHOW_AFTER_END_DAYS = 3;
+
+export function isEwcActive(): boolean {
+  const now = new Date().getTime();
+  const start = Date.parse(EWC_START);
+  const end = Date.parse(EWC_END) + EWC_SHOW_AFTER_END_DAYS * 24 * 60 * 60 * 1000;
+  return now >= start && now <= end;
+}
+
 // 試合の league/serie 名に "EWC" または "Esports World Cup" が含まれるか。
 // 単語境界で判定し、チーム名などへの偶発マッチを避ける。
 const EWC_PATTERN = /\bewc\b|esports world cup/i;
