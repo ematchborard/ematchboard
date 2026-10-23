@@ -6,7 +6,8 @@ import { roleLabelOf } from "@/lib/lol-roles";
 import type { Player } from "@/lib/types";
 
 // ファン採点(デプロイ2): カード型UI。
-// - 案内バー(受付中・注意書き・ファン選出MVP)
+// - 案内バー(受付中・注意書き)。ファン選出MVPは別コンポーネント(FanMvpCard)で
+//   Lineupsの上に常設表示する(こちらは投票カードの案内バーのみ)
 // - 2カラム(チームA=赤 / チームB=青)、モバイルはタブ切り替え
 // - カードをタップすると1〜10の数字がその場で開く(タップ1回で投票)
 // 平均点・自分の投票はページ表示後に/api/ratingsから取得する
@@ -16,7 +17,6 @@ import type { Player } from "@/lib/types";
 const TURNSTILE_SITE_KEY = "0x4AAAAAAFfz_mUUYY0c7nF_";
 const SCORES = Array.from({ length: 10 }, (_, i) => i + 1);
 const VOTING_WINDOW_DAYS = 7;
-const MVP_MIN_VOTES = 10;
 
 declare global {
   interface Window {
@@ -323,11 +323,6 @@ export default function PlayerRatingWidget({
     );
   }
 
-  const mvp = allPlayers
-    .map((p) => ({ player: p, stat: stats[p.id] }))
-    .filter((x): x is { player: Player; stat: PlayerStat } => !!x.stat && x.stat.count >= MVP_MIN_VOTES)
-    .sort((a, b) => b.stat.average - a.stat.average)[0];
-
   const tabButtonClass = (active: boolean) =>
     `flex-1 rounded-lg px-3 py-2 text-center text-sm font-semibold transition-colors ${
       active ? "bg-surface text-foreground shadow-sm" : "text-muted"
@@ -355,11 +350,6 @@ export default function PlayerRatingWidget({
             ・ 10点満点 ・ 1人1回 ・ ログイン不要 ・ あと{daysRemaining(beginAt)}日 ・ {totalVoters}人が採点
           </span>
         </p>
-        {mvp && (
-          <span className="shrink-0 rounded-lg bg-surface px-2.5 py-1 text-xs font-semibold">
-            <span className="text-muted">ファン選出MVP</span> {mvp.player.name} {mvp.stat.average.toFixed(1)}
-          </span>
-        )}
       </div>
 
       <div className="mb-3 flex gap-1.5 rounded-xl bg-surface-hover p-1 md:hidden">

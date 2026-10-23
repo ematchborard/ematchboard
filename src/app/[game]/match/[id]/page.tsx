@@ -14,6 +14,7 @@ import { jsonLdString } from "@/lib/seo";
 import { markUnavailable } from "@/lib/unavailable-flag";
 import { WORLDS_SERIE_ID } from "@/lib/worlds";
 import { ROSTER_OVERRIDES } from "@/data/roster-overrides";
+import FanMvpCard from "@/components/FanMvpCard";
 import LocalTime from "@/components/LocalTime";
 import MatchLineups from "@/components/MatchLineups";
 import MatchRow from "@/components/MatchCard";
@@ -154,6 +155,14 @@ export default async function MatchPage({ params }: Props) {
 
   const teamARef = match.opponents[0]?.opponent ?? null;
   const teamBRef = match.opponents[1]?.opponent ?? null;
+  // ファン採点(MVPカード・ラインナップの点数バッジ・投票カード)で共通して使う
+  // 「控えを除いた5人」。3箇所で同じ選出結果にするため一度だけ計算する
+  const ratingTeamAPlayers = isWorldsMatch
+    ? selectStartingFive(teamA?.players ?? [], ROSTER_OVERRIDES[match.id]?.teamAIds)
+    : [];
+  const ratingTeamBPlayers = isWorldsMatch
+    ? selectStartingFive(teamB?.players ?? [], ROSTER_OVERRIDES[match.id]?.teamBIds)
+    : [];
 
   const scoreOf = (team: Team | null) =>
     team ? (match.results.find((r) => r.team_id === team.id)?.score ?? null) : null;
@@ -364,6 +373,17 @@ export default async function MatchPage({ params }: Props) {
         </section>
       )}
 
+      {!isStartgg && isWorldsMatch && (
+        <FanMvpCard
+          matchId={match.id}
+          isFinished={match.status === "finished"}
+          teamAName={teamARef?.name ?? "Team A"}
+          teamBName={teamBRef?.name ?? "Team B"}
+          teamAPlayers={ratingTeamAPlayers}
+          teamBPlayers={ratingTeamBPlayers}
+        />
+      )}
+
       <section>
         <h2 className="mb-2 text-sm font-semibold">Lineups</h2>
         {!isStartgg && !isWorldsMatch ? (
@@ -383,7 +403,11 @@ export default async function MatchPage({ params }: Props) {
             )}
           </div>
         ) : (
-          <MatchLineups teamA={teamA} teamB={teamB} />
+          <MatchLineups
+            teamA={teamA}
+            teamB={teamB}
+            ratingsMatchId={!isStartgg && isWorldsMatch && match.status === "finished" ? match.id : undefined}
+          />
         )}
       </section>
 
@@ -394,8 +418,8 @@ export default async function MatchPage({ params }: Props) {
           beginAt={match.begin_at}
           teamAName={teamARef?.name ?? "Team A"}
           teamBName={teamBRef?.name ?? "Team B"}
-          teamAPlayers={selectStartingFive(teamA?.players ?? [], ROSTER_OVERRIDES[match.id]?.teamAIds)}
-          teamBPlayers={selectStartingFive(teamB?.players ?? [], ROSTER_OVERRIDES[match.id]?.teamBIds)}
+          teamAPlayers={ratingTeamAPlayers}
+          teamBPlayers={ratingTeamBPlayers}
         />
       )}
     </div>
