@@ -296,17 +296,35 @@ export async function getMatch(id: number): Promise<SingleFetchResult<MatchDetai
   }
 }
 
-// チームの直近の過去試合 (フォーム表示・過去対戦成績の計算用)
-export async function getTeamRecentMatches(id: number): Promise<Match[]> {
+// 試合ページ単位ではなくチームID単位でCache APIに6時間キャッシュする。
+// どの試合ページ(同じチームが絡む全試合)からも同じキャッシュを使うので、
+// 実質「チームごとにPandaScoreへは6時間に1回」になる。Worlds出場チームは
+// 加えてCronで1時間おきに温めておく(lib/worlds-recent-form.ts)ので、
+// 試合ページ側がPandaScoreを直接呼ぶのは基本的に非Worldsチームだけになる。
+// 2026-10-21に「終了から48時間経った試合はそもそも取得しない」対応をしたが
+// Recent formが出せなくなっていたため、2026-10-24にこちらへ置き換えた
+export const RECENT_FORM_TTL_SEC = 6 * 60 * 60;
+export const recentFormCacheKey = (teamId: number) =>
+  `https://edge-cache.internal/team-recent-matches/${teamId}`;
+
+// 戻り値がnull = 取得失敗(呼び出し側で欄ごと非表示にする)。
+// 空配列 = 取得は成功したが直近の試合が無い、という区別
+export async function getTeamRecentMatches(id: number): Promise<Match[] | null> {
   if (!hasApiToken()) return mockTeamMatches(id).past;
+
+  const cached = await edgeCacheGet<Match[]>(recentFormCacheKey(id));
+  if (cached) return cached;
+
   try {
-    return await psFetch<Match[]>(`/matches/past`, {
+    const matches = await psFetch<Match[]>(`/matches/past`, {
       "filter[opponent_id]": String(id),
       sort: "-begin_at",
       per_page: "30",
     });
+    await edgeCachePut(recentFormCacheKey(id), JSON.stringify(matches), RECENT_FORM_TTL_SEC);
+    return matches;
   } catch {
-    return [];
+    return null;
   }
 }
 

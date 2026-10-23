@@ -19,7 +19,8 @@
 // @ts-ignore
 import handler from "./.open-next/worker.js";
 import { buildTodaySnapshot, writeTodaySnapshot } from "./src/lib/today-snapshot";
-import { buildWorldsSnapshot, writeWorldsSnapshot } from "./src/lib/worlds-snapshot";
+import { buildWorldsSnapshot, readWorldsSnapshot, writeWorldsSnapshot } from "./src/lib/worlds-snapshot";
+import { extractWorldsTeamIds, refreshWorldsRecentForm } from "./src/lib/worlds-recent-form";
 
 interface Env {
   MATCH_CACHE: KVNamespace;
@@ -136,11 +137,41 @@ async function runWorldsSnapshotJob(env: Env): Promise<void> {
   }
 }
 
+// Worlds出場チームの直近成績(Recent form)を1時間おきにまとめて温めておく
+// (lib/worlds-recent-form.ts。lib/pandascore.tsのgetTeamRecentMatchesと同じ
+// キャッシュキーに書くので、試合ページ側はCronが先に書いていればPandaScoreを
+// 呼ばずに済む)
+async function runWorldsRecentFormJob(env: Env): Promise<void> {
+  if (!env.PANDASCORE_TOKEN) return; // 他のジョブで既にログ済み
+  try {
+    const snapshot = await readWorldsSnapshot(env.MATCH_CACHE);
+    if (!snapshot) return;
+    const teamIds = extractWorldsTeamIds(snapshot);
+    if (teamIds.length === 0) return;
+    await refreshWorldsRecentForm(env.PANDASCORE_TOKEN, teamIds);
+    console.log(`[cron][worlds-recent-form] refreshed ${teamIds.length} teams`);
+  } catch (err) {
+    console.error("[cron][worlds-recent-form] failed:", err);
+  }
+}
+
+// 2種類のtriggerをevent.cronで振り分ける(wrangler.jsonc参照)。
+// 2026-10-24、ここをevent.cronで分けずに全ジョブを無条件実行していたところ、
+// 毎時0分に両triggerが同時に発火して全クロンジョブが二重実行され、本番で
+// Cloudflare WorkerのCPU/リソース制限超過(503 error 1102)が断続的に
+// 発生する障害になった。triggerごとに対応するジョブだけを実行することと、
+// 2つのtriggerの発火タイミングを重ねない("*/5 * * * *"の0分と衝突しない
+// "7 * * * *"を使う)ことの両方で再発を防いでいる
 export default {
   fetch: fetchWithFinishedMatchCache,
-  async scheduled(_event, env: Env, ctx) {
-    ctx.waitUntil(runSnapshotJob(env));
-    ctx.waitUntil(runWorldsSnapshotJob(env));
+  async scheduled(event, env: Env, ctx) {
+    if (event.cron === "*/5 * * * *") {
+      ctx.waitUntil(runSnapshotJob(env));
+      ctx.waitUntil(runWorldsSnapshotJob(env));
+    }
+    if (event.cron === "7 * * * *") {
+      ctx.waitUntil(runWorldsRecentFormJob(env));
+    }
   },
 } satisfies ExportedHandler<Env>;
 
