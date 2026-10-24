@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import { getRunningSeries } from "@/lib/featured";
+import GameSearch from "@/components/GameSearch";
 import GameSidebar from "@/components/GameSidebar";
 import GameTabs from "@/components/GameTabs";
 import LanguageSelect from "@/components/LanguageSelect";
@@ -67,14 +69,21 @@ export default async function RootLayout({
         />
         <header className="sticky top-0 z-10 border-b border-border-subtle bg-background/90 backdrop-blur">
           <div className="mx-auto w-full max-w-5xl px-4 pt-4 pb-3 md:pb-4">
-            <div className="flex items-center justify-between">
-              <Link href="/" prefetch={false} className="text-lg font-bold tracking-tight">
+            <div className="flex items-center justify-between gap-3">
+              <Link href="/" prefetch={false} className="shrink-0 text-lg font-bold tracking-tight">
                 <span className="text-brand">e</span>MATCH BOARD
               </Link>
-              <div className="flex items-center gap-2">
+              <div className="hidden w-48 md:block">
+                <GameSearch />
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
                 <ThemeToggle />
                 <LanguageSelect />
               </div>
+            </div>
+            {/* スマホ幅では検索ボックスも専用の行にする(タイトル行が窮屈になるため) */}
+            <div className="mt-3 md:hidden">
+              <GameSearch />
             </div>
             {/* スマホ幅ではサイドバーの代わりにタブでゲーム切替 */}
             <div className="md:hidden">
@@ -90,10 +99,11 @@ export default async function RootLayout({
         </div>
         {/* Cloudflare Web Analytics (Cookie不使用のアクセス解析) */}
         {process.env.NODE_ENV === "production" && (
-          <script
+          <Script
             type="module"
             src="https://static.cloudflareinsights.com/beacon.min.js"
             data-cf-beacon='{"token": "ee9ceef6506a4c269589b76da9f9c0bb"}'
+            strategy="afterInteractive"
           />
         )}
         <footer className="mx-auto w-full max-w-5xl px-4 pb-6 text-center text-xs text-muted">
