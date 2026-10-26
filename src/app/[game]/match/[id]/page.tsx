@@ -8,6 +8,7 @@ import {
   getTeamRecentMatches,
 } from "@/lib/pandascore";
 import { getStartggMatch } from "@/lib/startgg";
+import { getAiRatingForMatch, resolveAiRatings } from "@/lib/ai-ratings";
 import { selectBench, selectStartingFive } from "@/lib/lol-roles";
 import type { Match, MatchDetail, Team, TeamDetail } from "@/lib/types";
 import { jsonLdString } from "@/lib/seo";
@@ -167,6 +168,9 @@ export default async function MatchPage({ params }: Props) {
     : [];
   const ratingTeamABench = isWorldsMatch ? selectBench(teamA?.players ?? [], ratingTeamAPlayers) : [];
   const ratingTeamBBench = isWorldsMatch ? selectBench(teamB?.players ?? [], ratingTeamBPlayers) : [];
+  // AI評価(参考)。data/ai-ratings.jsonに該当matchIdが無ければ常に空(非表示)
+  const aiMatchRating = isWorldsMatch ? getAiRatingForMatch(match.id) : null;
+  const aiRatings = resolveAiRatings(aiMatchRating, [...ratingTeamAPlayers, ...ratingTeamBPlayers]);
 
   const scoreOf = (team: Team | null) =>
     team ? (match.results.find((r) => r.team_id === team.id)?.score ?? null) : null;
@@ -433,6 +437,8 @@ export default async function MatchPage({ params }: Props) {
           teamBName={teamBRef?.name ?? "Team B"}
           teamAPlayers={ratingTeamAPlayers}
           teamBPlayers={ratingTeamBPlayers}
+          aiNote={aiMatchRating?.note}
+          aiRatings={aiRatings}
         />
       )}
     </div>

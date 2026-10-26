@@ -2,6 +2,7 @@
 
 import Script from "next/script";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AiPlayerRating } from "@/lib/ai-ratings";
 import { roleLabelOf } from "@/lib/lol-roles";
 import type { Player } from "@/lib/types";
 
@@ -76,6 +77,7 @@ function PlayerAvatar({ player }: { player: Player }) {
 function PlayerCard({
   player,
   stat,
+  aiRating,
   accent,
   expanded,
   pending,
@@ -84,6 +86,7 @@ function PlayerCard({
 }: {
   player: Player;
   stat: PlayerStat | undefined;
+  aiRating: AiPlayerRating | undefined;
   accent: Accent;
   expanded: boolean;
   pending: boolean;
@@ -112,6 +115,14 @@ function PlayerCard({
             {stat && stat.count > 0 ? stat.average.toFixed(1) : "-"}
           </p>
           <p className="text-[10px] text-muted">{stat?.count ?? 0}人</p>
+          {aiRating && (
+            <span
+              title={aiRating.reason}
+              className="mt-0.5 inline-block rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold text-violet-400"
+            >
+              AI {aiRating.score.toFixed(1)}
+            </span>
+          )}
         </div>
       </button>
       {expanded && (
@@ -147,6 +158,7 @@ function TeamColumn({
   accent,
   players,
   stats,
+  aiRatings,
   expandedId,
   pendingId,
   onToggle,
@@ -157,6 +169,7 @@ function TeamColumn({
   accent: Accent;
   players: Player[];
   stats: Record<number, PlayerStat>;
+  aiRatings: Record<number, AiPlayerRating>;
   expandedId: number | null;
   pendingId: number | null;
   onToggle: (playerId: number) => void;
@@ -185,6 +198,7 @@ function TeamColumn({
             key={p.id}
             player={p}
             stat={stats[p.id]}
+            aiRating={aiRatings[p.id]}
             accent={accent}
             expanded={expandedId === p.id}
             pending={pendingId === p.id}
@@ -205,6 +219,8 @@ export default function PlayerRatingWidget({
   teamBName,
   teamAPlayers,
   teamBPlayers,
+  aiNote,
+  aiRatings = {},
 }: {
   matchId: number;
   isFinished: boolean;
@@ -213,6 +229,8 @@ export default function PlayerRatingWidget({
   teamBName: string;
   teamAPlayers: Player[];
   teamBPlayers: Player[];
+  aiNote?: string;
+  aiRatings?: Record<number, AiPlayerRating>;
 }) {
   const allPlayers = useMemo(() => [...teamAPlayers, ...teamBPlayers], [teamAPlayers, teamBPlayers]);
   const [stats, setStats] = useState<Record<number, PlayerStat>>({});
@@ -339,6 +357,12 @@ export default function PlayerRatingWidget({
       <div ref={containerRef} className={turnstileVisible ? "mb-2" : "h-0 w-0 overflow-hidden"} />
       {error && <p className="mb-2 text-xs text-live">{error}</p>}
 
+      {aiNote && (
+        <p className="mb-3 text-[11px] text-muted">
+          AI評価は試合レポートと公式情報をもとにした参考値です。ファン採点とは別です
+        </p>
+      )}
+
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-live/30 bg-live/10 px-4 py-3">
         <span className="shrink-0 rounded-full bg-live px-2 py-0.5 text-[10px] font-bold text-white">
           受付中
@@ -367,6 +391,7 @@ export default function PlayerRatingWidget({
           accent="red"
           players={teamAPlayers}
           stats={stats}
+          aiRatings={aiRatings}
           expandedId={expandedId}
           pendingId={pendingId}
           onToggle={(id) => setExpandedId((prev) => (prev === id ? null : id))}
@@ -378,6 +403,7 @@ export default function PlayerRatingWidget({
           accent="blue"
           players={teamBPlayers}
           stats={stats}
+          aiRatings={aiRatings}
           expandedId={expandedId}
           pendingId={pendingId}
           onToggle={(id) => setExpandedId((prev) => (prev === id ? null : id))}
