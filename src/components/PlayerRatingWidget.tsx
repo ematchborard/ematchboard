@@ -95,13 +95,30 @@ function PlayerCard({
 }) {
   const accentText = accent === "red" ? "text-live" : "text-blue-500";
   const accentBg = accent === "red" ? "bg-live text-white" : "bg-blue-500 text-white";
+  const fanCount = stat?.count ?? 0;
+  // ファンの票が10票未満のうちはAI評価を目立たせ、10票以上になったら
+  // ファン採点をメインの数字にする
+  const showAiAsMain = !!aiRating && fanCount < 10;
+  const [showReason, setShowReason] = useState(false);
+
+  const aiToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowReason((v) => !v);
+  };
 
   return (
     <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface">
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onToggle}
-        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-hover"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        className="flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-hover"
       >
         <PlayerAvatar player={player} />
         <div className="min-w-0 flex-1">
@@ -111,20 +128,46 @@ function PlayerCard({
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className={`text-lg font-bold tabular-nums ${accentText}`}>
-            {stat && stat.count > 0 ? stat.average.toFixed(1) : "-"}
-          </p>
-          <p className="text-[10px] text-muted">{stat?.count ?? 0}人</p>
-          {aiRating && (
-            <span
-              title={aiRating.reason}
-              className="mt-0.5 inline-block rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold text-violet-400"
-            >
-              AI {aiRating.score.toFixed(1)}
-            </span>
+          {showAiAsMain ? (
+            <>
+              <button
+                type="button"
+                title={aiRating.reason}
+                onClick={aiToggle}
+                className="text-lg font-bold tabular-nums text-violet-400"
+              >
+                {aiRating.score.toFixed(1)} <span className="text-[9px] align-top">AI</span>
+              </button>
+              <p className="text-[10px] text-muted">
+                {fanCount > 0 ? `${stat!.average.toFixed(1)} (${fanCount}人)` : "採点してね"}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className={`text-lg font-bold tabular-nums ${accentText}`}>
+                {fanCount > 0 ? stat!.average.toFixed(1) : "-"}
+              </p>
+              <p className="text-[10px] text-muted">{fanCount}人</p>
+              {aiRating && (
+                <button
+                  type="button"
+                  title={aiRating.reason}
+                  onClick={aiToggle}
+                  className="mt-0.5 inline-block rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold text-violet-400"
+                >
+                  AI {aiRating.score.toFixed(1)}
+                </button>
+              )}
+            </>
           )}
         </div>
-      </button>
+      </div>
+      {showReason && aiRating && (
+        <p className="border-t border-border-subtle bg-violet-500/5 px-3 py-2 text-xs text-muted">
+          <span className="font-bold text-violet-400">AI評価: </span>
+          {aiRating.reason}
+        </p>
+      )}
       {expanded && (
         <div className="border-t border-border-subtle px-3 py-2.5">
           <div className="grid grid-cols-5 gap-1.5">
